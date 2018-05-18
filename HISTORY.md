@@ -1,3 +1,5 @@
+## 2.4.0
+* Persistor fetch methods must be able to get session object from the amorphic injected method.
 ## 2.3.14
 * removed unused function injectIntoObject
 ## 2.3.13

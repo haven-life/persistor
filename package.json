@@ -5,7 +5,7 @@
     "version": "2.3.14",
     "dependencies": {
         "q": "1.x",
-        "supertype": "2.2.*",
+        "supertype": "haven-life/supertype#test/seperate-branch",
         "underscore": "1.x",
         "mongodb-bluebird": "x",
         "bluebird": "x",

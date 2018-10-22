@@ -1,3 +1,5 @@
+## 2.6.0
+* logging exception as knex undefined error is not giving any useful information to debug. 
 ## 2.5.1
 * Fixed issue where it was referencing an expired git url for supertype
 ## 2.5.0

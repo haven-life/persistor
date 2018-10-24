@@ -197,8 +197,9 @@ describe('persistor transaction checks', function () {
     it('persistorFetchById with fetch spec with type projections', function () {
         return Employee.persistorFetchById(empId, {fetch: { homeAddress: {fetch: {phone: true}}, roles: true}, projection: { Address: ['city'], Role: ['name'], Phone: ['']}}).then(function(employee) {
             expect(employee.homeAddress.state).is.equal(undefined);
-            expect(employee.homeAddress.city).is.not.equal(null);
+            expect(employee.homeAddress.city).is.equal('New York');
             expect(employee.homeAddress.phone.number).is.equal(undefined);
+            expect(employee.homeAddress.phone._id).is.equal(phoneId);
         });
     });
 

@@ -42,16 +42,16 @@
     "scripts": {
         "lint": "eslint .",
         "coverage": "nyc mocha --exit -- test/* -R spec",
-        "test": "nyc _mocha -- test/* -R spec",
-        "test:debug": "mocha test/**/*.js --inspect-brk=0.0.0.0:5858",
+        "test": "nyc _mocha -- dist/test/*.js -R spec",
+        "test:debug": "mocha dist/test/*.js --inspect-brk=0.0.0.0:5858",
         "test:docker": "docker-compose up --build",
         "test:docker:debug": "docker-compose -f docker-compose-debug.yml up --build",
-        "test:compiled:js": "mocha test/supertype/persist_banking_pgsql.js",
+        "test:compiled:js": "mocha dist/test/supertype/persist_banking_pgsql.js",
         "test:config": "mocha test/config",
         "test:example": "mocha test/example",
         "test:ts": "mocha --compilers ts:ts-node/register test/supertype/persist_banking_pgsql.ts",
         "test:ts:debug": "mocha --inspect-brk --compilers ts:ts-node/register test/supertype/persist_banking_pgsql.ts",
-        "compile": "tsc && cp index.js dist/ && cp -R lib dist/"
+        "compile": "tsc && cp -R lib dist/"
     },
     "bugs": {
         "url": "http://github.com/haven-life/persistor/issues"

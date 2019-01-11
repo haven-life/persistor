@@ -20,6 +20,8 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      * PUBLIC INTERFACE FOR OBJECTS
      */
 
+
+    // @DONE - moved to ts
     PersistObjectTemplate.getPersistorProps = function () {
         var persistorProps = {};
         _.each(PersistObjectTemplate.__dictionary__, processTemplate);
@@ -44,11 +46,16 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      *
      * @param {supertype} template - load all parent/child/subdocument/subsetof defitions
      */
+
+    //    // @DONE - moved to ts
     PersistObjectTemplate._injectIntoTemplate = function (template) {
         this._prepareSchema(template);
         this._injectTemplateFunctions(template);
         this._injectObjectFunctions(template);
     }
+
+        // @DONE - moved to ts
+
     PersistObjectTemplate._prepareSchema = function (template) {
         if (!this.schemaVerified) {
             this._verifySchema();

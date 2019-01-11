@@ -11,7 +11,7 @@
         "mongodb-bluebird": "x",
         "pg": "7.4.1",
         "q": "1.x",
-        "supertype": "3.1.*",
+        "supertype": "github:haven-life/supertype#bug/fixing-decorator-supertypeclass",
         "tv4": "^1.2.7",
         "underscore": "1.x"
     },

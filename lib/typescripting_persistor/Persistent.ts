@@ -7,6 +7,13 @@ import { UtilityFunctions } from './UtilityFunctions';
 
 export class Persistent extends Supertype {
 
+    __template__: typeof Persistent;
+
+    _id: string;
+    __version__: number;
+    amorphic: Persistor;
+    static __collection__: any;
+
     // New names
 
     /**
@@ -264,14 +271,145 @@ export class Persistent extends Supertype {
         return `${ifAlias}_id`;
     }
 
-    persistorSave(options?): any { };
-    persistorRefresh(logger?): any { }
-    persistorDelete(options?): any { };
-    persistorIsStale(): any { }
+    async persistorFetchReferences(options) {
+        PersistObjectTemplate._validateParams(options, 'fetchSchema', this.__template__);
 
-    _id: string;
-    __version__: number;
-    amorphic: Persistor;
+        options = options || {};
+
+        const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
+
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'fetchReferences',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+
+        var properties = {}
+        var objectProperties = this.__template__.getProperties();
+        for (var prop in options.fetch) {
+            properties[prop] = objectProperties[prop];
+        }
+
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+        if (dbType == PersistObjectTemplate.DB_Mongo) {
+            return await PersistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, {}, options.fetch, this, properties, options.transient, usedLogger);
+        }
+        else {
+            return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, {}, options.fetch, options.transient, null, this, properties, undefined, undefined, undefined, usedLogger)
+        }
+    }
+
+    async persistorSave(options?) {
+        PersistObjectTemplate._validateParams(options, 'persistSchema', this.__template__);
+
+        options = options || {};
+        var txn = PersistObjectTemplate.getCurrentOrDefaultTransaction(options.transaction);
+        var cascade = options.cascade;
+
+        const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
+
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'save',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+
+        if (!txn) {
+            return await this.persistSave(null, usedLogger);
+        }
+        else {
+            return this.setDirty(txn, false, cascade, usedLogger);
+        }
+    };
+    async persistorRefresh(logger?) {
+        const usedLogger = logger ? logger : PersistObjectTemplate.logger;
+
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'refresh',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+        //return this.__template__.getFromPersistWithId(this._id, null, null, null, true, logger)
+        if (dbType == PersistObjectTemplate.DB_Mongo) {
+            return await PersistObjectTemplate.getFromPersistWithMongoId(this.__template__, this._id, null, null, null, usedLogger);
+        }
+        else {
+            return await PersistObjectTemplate.getFromPersistWithKnexId(this.__template__, this._id, null, null, null, true, usedLogger);
+        }
+    }
+    
+    // persistorDelete will only support new API calls.
+    async persistorDelete(options?) { 
+        PersistObjectTemplate._validateParams(options, 'persistSchema', this.__template__);
+
+        options = options || {};
+        var txn = PersistObjectTemplate.getCurrentOrDefaultTransaction(options.transaction);
+        var cascade = options.cascade;
+        const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
+
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'delete',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+
+        if (!txn) {
+            return await this.__template__.deleteFromPersistWithId(this._id, null, usedLogger)
+        }
+        else {
+            return PersistObjectTemplate.setAsDeleted(this, txn, false, !cascade, usedLogger);
+        }
+    }
+    async persistorIsStale() {
+        const persistObjectTemplate = PersistObjectTemplate;
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+        let id;
+        if (dbType == persistObjectTemplate.DB_Mongo) {
+            id = persistObjectTemplate.ObjectID(this._id.toString())
+        }
+        else {
+            id = this._id;
+        }
+
+        const count = await this.__template__.countFromPersistWithQuery(
+            {
+                _id: id,
+                __version__: this.__version__
+            });
+        return !count;
+    }
 
     // Legacy
 
@@ -430,7 +568,7 @@ export class Persistent extends Supertype {
     * @returns {Number}
     * @deprecated in favor of persistorCountWithQuery
     */
-    static countFromPersistWithQuery(query?, logger?) {
+    static async countFromPersistWithQuery(query?, logger?) {
         const usedLogger = logger ? logger : PersistObjectTemplate.logger;
         usedLogger.debug(
             {
@@ -458,23 +596,234 @@ export class Persistent extends Supertype {
         }
     }
 
+    // Legacy
+    async fetchProperty(prop, cascade?, queryOptions?, isTransient?, idMap?, logger?) {
+        const usedLogger = logger ? logger : PersistObjectTemplate.logger;
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'fetchProperty',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
 
-    fetchProperty(prop, cascade?, queryOptions?, isTransient?, idMap?, logger?): any { }
-    fetch(cascade, isTransient?, idMap?, logger?): any { }
-    fetchReferences(options): any { }
-    persistSave(txn?, logger?): any { }
-    persistTouch(txn?, logger?): any { }
-    persistDelete(txn?, logger?): any { }
-    cascadeSave(any): any { }
-    isStale(): any { }
-    persist(options): any { }
-    setDirty(txn?, onlyIfChanged?, noCascade?, logger?): any { }
-    setAsDeleted(txn?, onlyIfChanged?): any { }
-    refresh(logger?): any { };
 
-    getTableName(): any { }
-    getParentKey(): any { }
+        idMap = idMap || {};
+        var properties = {};
+        var objectProperties = this.__template__.getProperties();
+        properties[prop] = objectProperties[prop];
 
+        if (queryOptions) {
+            properties[prop].queryOptions = queryOptions;
+        }
+        var cascadeTop = {};
+        cascadeTop[prop] = cascade || true;
+
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+        if (dbType == PersistObjectTemplate.DB_Mongo) {
+            return await PersistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, idMap, cascadeTop, this, properties, isTransient, usedLogger);
+        }
+        else {
+            return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascadeTop, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
+        }
+    }
+
+    async fetch(cascade, isTransient?, idMap?, logger?) {
+        const usedLogger = logger ? logger : PersistObjectTemplate.logger;
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'fetch',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+        idMap = idMap || {};
+
+        var properties = {}
+        var objectProperties = this.__template__.getProperties();
+        for (var prop in cascade) {
+            properties[prop] = objectProperties[prop];
+        }
+
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+
+        var previousDirtyTracking = PersistObjectTemplate.__changeTracking__;
+        PersistObjectTemplate.__changeTracking__ = false;
+
+        try {
+            if (dbType == PersistObjectTemplate.DB_Mongo) {
+                return await PersistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, idMap, cascade, this, properties, isTransient, usedLogger);
+            }
+            else {
+                return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascade, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
+            }
+        }
+        finally {
+            PersistObjectTemplate.__changeTracking__ = previousDirtyTracking;
+        }
+    }
+
+    // Legacy 
+    async fetchReferences(options) {
+        return await this.persistorFetchReferences(options);
+    }
+
+    /**
+     * @legacy 
+     *
+     * @param {*} [txn]
+     * @param {*} [logger]
+     * @returns {*}
+     * @memberof Persistent
+     */
+
+    // @TODO: ask srksag if this is async
+    async persistSave(txn?, logger?) {
+        // var persistObjectTemplate = this.__objectTemplate__ || self; //@TODO: ask srksag is this ever set (this.__objectTemplate__)
+
+        const persistObjectTemplate = PersistObjectTemplate;
+        const usedLogger = logger ? logger : PersistObjectTemplate.logger;
+
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'persistSave',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+        //@TODO: Ask srksag how come there's no catch for errors here
+
+        if (dbType == persistObjectTemplate.DB_Mongo) {
+            const returnVal = await persistObjectTemplate.persistSaveMongo(this, undefined, undefined, undefined, txn, logger)
+            if (txn) {
+                persistObjectTemplate.saved(returnVal, txn); //@TODO: might need to await here
+            }
+            return await returnVal._id.toString(); //@TODO: do we need to await here? we already awaited returnval
+        }
+        else {
+            const returnVal = await persistObjectTemplate.persistSaveKnex(this, txn, logger);
+            if (txn) {
+                persistObjectTemplate.saved(returnVal, txn);  //@TODO: might need to await here
+            }
+
+            return await returnVal._id.toString(); //@TODO: do we need to await here? we already awaited returnval
+        }
+    }
+
+    // Legacy -- just use persistorSave
+    async persistTouch(txn?, logger?) {
+        const persistObjectTemplate = PersistObjectTemplate;
+        const usedLogger = logger ? logger : PersistObjectTemplate.logger;
+
+        usedLogger.debug(
+            {
+                component: 'persistor',
+                module: 'api',
+                activity: 'persistTouch',
+                data:
+                {
+                    template: this.__template__.__name__,
+                    id: this.__id__
+                }
+            });
+        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
+        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+
+        //@TODO: Ask srksag how come there's no catch for errors here
+
+        if (dbType == persistObjectTemplate.DB_Mongo) {
+            return await persistObjectTemplate.persistSaveMongo(this, undefined, undefined, undefined, txn, logger);
+        }
+        else {
+            return persistObjectTemplate.persistTouchKnex(this, txn, logger);
+        }
+    }
+
+    //persistDelete is modified to support both legacy and V2, options this is passed for V2 as the first parameter.
+
+    // Legacy
+    persistDelete(txn?, logger?) {
+
+        if (!txn || (txn && txn.knex && txn.knex.transacting)) {
+
+            const usedLogger = logger ? logger : PersistObjectTemplate.logger;
+
+            usedLogger.debug(
+                {
+                    component: 'persistor',
+                    module: 'api',
+                    activity: 'persistDelete',
+                    data:
+                    {
+                        template: this.__template__.__name__,
+                        id: this.__id__
+                    }
+                });
+
+            if (txn) {
+                delete txn.dirtyObjects[this.__id__];
+            }
+            return await this.__template__.deleteFromPersistWithId(this._id, txn, logger)
+        }
+        else {
+            //for V2 options are passed as the first parameter -- @TODO ask srksag about this
+            return await this.deleteV2.call(this, txn);
+        }
+    }
+
+    // Legacy
+    cascadeSave(txn?, logger?) {
+        const transaction = txn || PersistObjectTemplate.currentTransaction;
+        return PersistObjectTemplate.setDirty(this, transaction, true, false, logger);
+    }
+
+    // Legacy
+    async isStale() {
+        return await this.persistorIsStale();
+    }
+
+    // Legacy
+    async persist(options) {
+        return await this.persistorSave(options);
+    }
+
+    // Legacy --- @TODO: ask srksag, why this is called noCascade,  but setDirty is asking for !cascade
+
+    //Original: setDirty(txn?, onlyIfChanged?, noCascade?, logger?)  {
+    setDirty(txn?, onlyIfChanged?, noCascade?, logger?) {
+        //Original: PersistObjectTemplate.setDirty(this, txn, onlyIfChanged, !cascade, logger);
+        return PersistObjectTemplate.setDirty(this, txn, onlyIfChanged, !noCascade, logger);
+    }
+
+
+    setAsDeleted(txn?, onlyIfChanged?) {
+        return PersistObjectTemplate.setAsDeleted(this, txn, onlyIfChanged)
+    }
+
+    // Legacy
+    async refresh(logger?) {
+        return await this.persistorRefresh(logger);
+    };
 
     /**
     * Inject the persitor properties and get/fetch methods need for persistence.  This is either called
@@ -531,7 +880,6 @@ export class Persistent extends Supertype {
     }
 
     // Deprecated API (DO NOT USE THESE)
-
     static isKnex() {
         return this.persistorIsKnex();
     }
@@ -543,7 +891,7 @@ export class Persistent extends Supertype {
     static getTableName(alias?: string) {
         return this.persistorGetTableName(alias);
     }
-    
+
     static getParentKey(prop: string, alias?: string) {
         return this.persistorGetParentKey(prop, alias);
     }
@@ -562,5 +910,9 @@ export class Persistent extends Supertype {
 
     static knexChildJoin(targetTemplate, primaryAlias, targetAlias, joinKey: string) {
         return this.persistorKnexChildJoin(targetTemplate, primaryAlias, targetAlias, joinKey);
+    }
+
+    async deleteV2(options) {
+        return await this.persistorDelete();
     }
 };

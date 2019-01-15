@@ -8,15 +8,6 @@ var expect = require('chai').expect;
 var ObjectTemplate = require('supertype').default;
 var PersistObjectTemplate = require('../dist/index.js')(ObjectTemplate, null, ObjectTemplate);
 var writing = true;
-/*
-PersistObjectTemplate.debug = function(m, t) {
-    if (t.match(/(query)|(io)/))
-    {
-        console.log(m)
-    }
-}
-*/
-var Promise = require('bluebird');
 
 var Customer = PersistObjectTemplate.create('Customer', {
     init: function (first, middle, last) {

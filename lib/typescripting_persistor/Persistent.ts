@@ -78,7 +78,7 @@ export class Persistent extends Supertype {
                 return await persistObjectTemplate.getFromPersistWithMongoQuery(this, query, options.fetch, options.start, options.limit, options.transient, options.order, options.order, usedLogger);
             }
             else {
-                return await persistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, options.fetch, options.start, options.limit, options.transient, null, options.order, undefined, undefined, usedLogger, options.enableChangeTracking, options.projection));
+                return await persistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, options.fetch, options.start, options.limit, options.transient, null, options.order, undefined, undefined, usedLogger, options.enableChangeTracking, options.projection);
             }
         } catch (err) {
             // This used to be options.logger || PersistObjectTemplate.logger
@@ -120,7 +120,7 @@ export class Persistent extends Supertype {
                 return await PersistObjectTemplate.countFromMongoQuery(this, query, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger))
+                return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, { activity: 'persistorCountByQuery' });

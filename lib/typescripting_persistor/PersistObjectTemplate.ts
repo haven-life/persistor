@@ -25,7 +25,6 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static DB_Knex = 'knex';
     static DB_Mongo = 'mongo';
     static schemaVerified: boolean;
-
     static baseClassForPersist: typeof ObjectTemplate;
     static currentTransaction: Transaction;
     static dirtyObjects: any;

@@ -1,4 +1,6 @@
 module.exports = function (PersistObjectTemplate) {
+
+    var Promise = require('bluebird');
     var _ = require('underscore');
 
     /**

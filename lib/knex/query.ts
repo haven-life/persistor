@@ -1,5 +1,6 @@
 module.exports = function (PersistObjectTemplate) {
 
+    var Promise = require('bluebird');
     var _ = require('underscore');
 
     PersistObjectTemplate.concurrency = 10;
@@ -128,7 +129,9 @@ module.exports = function (PersistObjectTemplate) {
         function processRequests() {
             var segLength = requests.length;
             //console.log("Processing " + segLength + " promises " + PersistObjectTemplate.concurrency);
-            return Promise.all(requests)
+            return Promise.map(requests, function (request, _ix) {
+                return request();
+            }, {concurrency: PersistObjectTemplate.concurrency})
                 .then(function () {
                     requests.splice(0, segLength);
                     if (requests.length > 0)

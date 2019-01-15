@@ -1,6 +1,4 @@
 module.exports = function (PersistObjectTemplate) {
-
-    var Promise = require('bluebird');
     var _ = require('underscore');
 
     var processedList = [];
@@ -654,10 +652,14 @@ module.exports = function (PersistObjectTemplate) {
         var loadTableDef = function(dbschema, tableName) {
             if (!dbschema[tableName])
                 dbschema[tableName] = {};
-            return [dbschema, schema, tableName];
+            return { dbschema, schema, tableName };
         };
 
-        var diffTable = function(dbschema, schema, tableName) {
+        var diffTable = function(diffTable) {
+            var tableName = diffTable.tableName;
+            var dbschema = diffTable.dbschema;
+            var schema = diffTable.schema;
+
             var dbTableDef = dbschema[tableName];
             var memTableDef = schema[tableName];
             var track = {add: [], change: [], delete: []};
@@ -698,7 +700,7 @@ module.exports = function (PersistObjectTemplate) {
             return _.reduce(localtemplate.__children__, function (_curr, o) {
                 return Promise.resolve()
                     .then(loadTableDef.bind(this, _dbschema, o.__name__))
-                    .spread(diffTable)
+                    .then(diffTable)
                     .then(generateChanges.bind(this, o));
             }, {});
         };
@@ -804,8 +806,8 @@ module.exports = function (PersistObjectTemplate) {
 
         return Promise.resolve()
             .then(loadSchema.bind(this, tableName))
-            .spread(loadTableDef)
-            .spread(diffTable)
+            .then(function (result) {loadTableDef(result[0], result[1])})
+            .then(diffTable)
             .then(generateChanges.bind(this, template))
             .then(mergeChanges)
             .then(applyTableChanges)
@@ -1148,11 +1150,14 @@ module.exports = function (PersistObjectTemplate) {
 
             // Walk through the dirty objects
             function processSaves() {
-                return Promise.map(_.toArray(dirtyObjects), function (obj) {
+                var dirtyObjects = _.toArray(dirtyObjects);
+                var promiseArr = dirtyObjects.map(function (obj) {
                     delete dirtyObjects[obj.__id__];  // Once scheduled for update remove it.
                     return callSave(obj).then(generateChanges.bind(this, obj, obj.__version__ === 1 ? 'insert' : 'update'));
-                }.bind(this), {concurrency: PersistObjectTemplate.concurrency}).then (function () {
-                    if (_.toArray(dirtyObjects). length > 0) {
+                }.bind(this));
+
+                return Promise.all(promiseArr).then(function () {
+                    if (dirtyObjects. length > 0) {
                         return processSaves.call(this);
                     }
                 });
@@ -1166,10 +1171,14 @@ module.exports = function (PersistObjectTemplate) {
 
 
             function processDeletes() {
-                return Promise.map(_.toArray(deletedObjects), function (obj) {
-                    delete deletedObjects[obj.__id__];  // Once scheduled for update remove it.
-                    return callDelete(obj).then(generateChanges.bind(this, obj, 'delete'));
-                }.bind(this), {concurrency: PersistObjectTemplate.concurrency}).then (function () {
+                var promiseArr = _.toArray(deletedObjects);
+
+                _.each(promiseArr, function(element) {
+                    delete deletedObjects[element.__id__];  // Once scheduled for update remove it.
+                    return callDelete(element).then(generateChanges.bind(this, element, 'delete'));
+                });
+
+                return Promise.all(promiseArr).then (function () {
                     if (_.toArray(deletedObjects). length > 0) {
                         return processDeletes.call(this);
                     }
@@ -1183,12 +1192,16 @@ module.exports = function (PersistObjectTemplate) {
             }
 
             function processDeleteQueries() {
-                return Promise.map(_.toArray(deleteQueries), function (obj) {
-                    delete deleteQueries[obj.name];  // Once scheduled for update remove it.
-                    return (obj.template && obj.template.__schema__
-                        ?  PersistObjectTemplate.deleteFromKnexQuery(obj.template, obj.queryOrChains, persistorTransaction, logger)
+                var promiseArr = _.toArray(deleteQueries);
+
+                _.each(promiseArr, function(element) {
+                    delete deleteQueries[element.name];  // Once scheduled for update remove it.
+                    return (element.template && element.template.__schema__
+                        ?  PersistObjectTemplate.deleteFromKnexQuery(element.template, element.queryOrChains, persistorTransaction, logger)
                         : true)
-                }.bind(this), {concurrency: PersistObjectTemplate.concurrency}).then (function () {
+                });
+
+                return Promise.all(promiseArr).then (function () {
                     if (_.toArray(deleteQueries). length > 0) {
                         return processDeleteQueries.call(this);
                     }
@@ -1214,11 +1227,15 @@ module.exports = function (PersistObjectTemplate) {
 
             // Walk through the touched objects
             function processTouches() {
-                return Promise.map(_.toArray(touchObjects), function (obj) {
-                    return (obj.__template__ && obj.__template__.__schema__ && !savedObjects[obj.__id__]
-                        ?  obj.persistTouch(persistorTransaction, logger)
+                var promiseArr = _.toArray(touchObjects);
+
+                _.each(promiseArr, function(element) {
+                    return (element.__template__ && element.__template__.__schema__ && !savedObjects[element.__id__]
+                        ?  element.persistTouch(persistorTransaction, logger)
                         : true)
-                }.bind(this))
+                });
+
+                return Promise.all(promiseArr);
             }
 
             function rollback (err) {

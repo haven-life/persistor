@@ -10,7 +10,6 @@ chai.use(chaiAsPromised);
 
 var ObjectTemplate = require('supertype').default;
 var PersistObjectTemplate = require('../dist/index.js')(ObjectTemplate, null, ObjectTemplate);
-var Promise = require('bluebird');
 var knexInit = require('knex');
 var knex;
 

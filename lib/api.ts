@@ -12,7 +12,6 @@
 
 module.exports = function (PersistObjectTemplate, baseClassForPersist) {
 
-    var Promise = require('bluebird');
     var _ = require('underscore');
 
 
@@ -22,6 +21,9 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
 
     PersistObjectTemplate.getPersistorProps = function () {
         var persistorProps = {};
+        for (var template in PersistObjectTemplate.__dictionary__) {
+            processTemplate(template);
+        }
         _.each(PersistObjectTemplate.__dictionary__, processTemplate);
         return persistorProps;
 
@@ -895,7 +897,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
         this.setSchema(schema);
         this.performInjections(); // Normally done by getTemplates
         return connection;
-    }
+    };
 
     /**
      * Mostly used for unit testing.  Drops all tables for templates that have a schema
@@ -922,7 +924,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      * @param {string} concurrency #parallel
      * @returns {*|Array}
      */
-    PersistObjectTemplate.onAllTables = function (action, concurrency) {
+    PersistObjectTemplate.onAllTables = function () {
         var templates = [];
         _.each(this.__dictionary__, drop);
         function drop (template) {
@@ -930,7 +932,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 templates.push(template);
             }
         }
-        return Promise.map(templates, action, {concurrency: concurrency || 1});
+        return Promise.all(templates);
     }
 
 };

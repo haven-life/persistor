@@ -4,6 +4,7 @@ import { Supertype } from 'supertype';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
 import { UtilityFunctions } from './UtilityFunctions';
 
+export type PersistentConstructor = typeof Persistent;
 
 export class Persistent extends Supertype {
 
@@ -13,6 +14,7 @@ export class Persistent extends Supertype {
     __version__: number;
     amorphic: Persistor;
     static __collection__: any;
+    static __schema__: any;
 
     // New names
 

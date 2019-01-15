@@ -3,6 +3,8 @@ import * as _ from 'underscore';
 import { ObjectTemplate } from 'supertype';
 
 import * as knex from 'knex';
+import { PersistentConstructor } from './Persistent';
+import { Schema } from './Schema';
 
 type Transaction = {
     id: number,
@@ -23,17 +25,49 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static DB_Knex = 'knex';
     static DB_Mongo = 'mongo';
     static schemaVerified: boolean;
-
     static baseClassForPersist: typeof ObjectTemplate;
     static currentTransaction: Transaction;
     static dirtyObjects: any;
     static savedObjects: {};
     static _db: any;
     static __defaultTransaction__: Transaction;
+    static _schema: any;
+    static noAutoIndex: any;
+
+    static __dictionary__: {[key: string]: PersistentConstructor};
 
     static initialize(baseClassForPersist: typeof ObjectTemplate) {
         this.init();
         this.baseClassForPersist = baseClassForPersist;
+    }
+
+    /**
+     * 
+     *  REDIRECTS FOR SCHEMA
+     */
+
+    static setSchema(schema) {
+        return Schema.setSchema(this, schema);
+    }
+
+    static appendSchema(schema) {
+        return Schema.appendSchema(this, schema);
+    }
+
+    /**
+    * Run through the schema entries and setup these properites on templates
+    *  __schema__: the schema for each template
+    *  __collection__: the name of the Mongo Collection
+    *  __topTemplate__: for a template that represents a subDocument the template that is primary for that colleciton
+    * 
+    * @private
+    */
+    static _verifySchema() {
+        return Schema._verifySchema(this);
+    }
+
+    static isCrossDocRef(template, prop, defineProperty) {
+        return Schema.isCrossDocRef(this, template, prop, defineProperty);
     }
 
 

@@ -3,9 +3,9 @@ var nextId = 1;
 var objectTemplate;
 
 import {PersistObjectTemplate} from './PersistObjectTemplate';
-// var supertype = require('supertype');
 import * as supertype from 'supertype';
-export default function indexFunct(baseClassForPersist: typeof supertype.default) {
+
+export default function start(baseClassForPersist: typeof supertype.default) {
     let PersistorOT = new PersistObjectTemplate();
 
     require('./api.js')(PersistorOT, baseClassForPersist);
@@ -25,6 +25,6 @@ let ObjectTemplate = supertype.default;
 
 export class Persistor { // for tests only
     static create() {
-        return indexFunct(ObjectTemplate); // @TODO: add indexFunct (default persistor export)
+        return start(ObjectTemplate); // @TODO: add indexFunct (default persistor export)
     }
 }

@@ -11,8 +11,6 @@
  */
 
 module.exports = function (PersistObjectTemplate, baseClassForPersist) {
-
-    var Promise = require('bluebird');
     var _ = require('underscore');
 
 
@@ -930,7 +928,12 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 templates.push(template);
             }
         }
-        return Promise.map(templates, action, {concurrency: concurrency || 1});
+
+        var promiseArr = templates.map(function(template) {
+            return action(template);
+        });
+
+        return Promise.all(promiseArr);
     }
 
 };

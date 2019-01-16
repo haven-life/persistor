@@ -21,9 +21,6 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
 
     PersistObjectTemplate.getPersistorProps = function () {
         var persistorProps = {};
-        for (var template in PersistObjectTemplate.__dictionary__) {
-            processTemplate(template);
-        }
         _.each(PersistObjectTemplate.__dictionary__, processTemplate);
         return persistorProps;
 
@@ -924,7 +921,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      * @param {string} concurrency #parallel
      * @returns {*|Array}
      */
-    PersistObjectTemplate.onAllTables = function () {
+    PersistObjectTemplate.onAllTables = function (action) {
         var templates = [];
         _.each(this.__dictionary__, drop);
         function drop (template) {
@@ -932,7 +929,9 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 templates.push(template);
             }
         }
-        return Promise.all(templates);
+
+        let promiseArr = _.each(templates, action(templates));
+        return Promise.all(promiseArr);
     }
 
 };

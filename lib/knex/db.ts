@@ -645,11 +645,13 @@ module.exports = function (PersistObjectTemplate) {
                     response = JSON.parse(record[0][schemaField]);
                 }
                 _dbschema = response;
-                return [response, template.__name__];
+                return { response, templateName: template.__name__ };
             })
         };
 
-        var loadTableDef = function(dbschema, tableName) {
+        var loadTableDef = function(dbTableMetaInfo) {
+            let dbschema = dbTableMetaInfo.dbschema;
+            let tableName = dbTableMetaInfo.tableName;
             if (!dbschema[tableName])
                 dbschema[tableName] = {};
             return { dbschema, schema, tableName };
@@ -806,7 +808,7 @@ module.exports = function (PersistObjectTemplate) {
 
         return Promise.resolve()
             .then(loadSchema.bind(this, tableName))
-            .then(function (result) {loadTableDef(result[0], result[1])})
+            .then(loadTableDef)
             .then(diffTable)
             .then(generateChanges.bind(this, template))
             .then(mergeChanges)

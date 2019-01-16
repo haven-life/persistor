@@ -1,9 +1,9 @@
 module.exports = function (PersistObjectTemplate) {
     var _ = require('underscore');
     var schemaValidator = require('tv4');
-    var uuidv1 = require('uuid/v1');
+    // var uuidv1 = require('uuid/v1');
 
-    PersistObjectTemplate.ObjectID = uuidv1();
+    PersistObjectTemplate.ObjectID = require('mongodb-bluebird').mongodb.ObjectID;
 
     PersistObjectTemplate.createTransientObject = function (cb) {
         var currentState = this.__transient__;

@@ -920,7 +920,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      * @param {string} concurrency #parallel
      * @returns {*|Array}
      */
-    PersistObjectTemplate.onAllTables = function (action, concurrency) {
+    PersistObjectTemplate.onAllTables = function (action) {
         var templates = [];
         _.each(this.__dictionary__, drop);
         function drop (template) {
@@ -932,7 +932,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
         let promiseArr = [];
 
         for(const template in templates) {
-            promiseArr.push(action.bind(this, template));
+            promiseArr.push(action(template));
         }
 
         return Promise.all(promiseArr);

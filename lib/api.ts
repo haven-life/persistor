@@ -12,6 +12,7 @@
 
 module.exports = function (PersistObjectTemplate, baseClassForPersist) {
     var _ = require('underscore');
+    var bluebird = require('bluebird');
 
 
     /**
@@ -929,9 +930,13 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
             }
         }
 
+        console.log("bluebird map", bluebird.map(templates, action, {concurrency: concurrency || 1}));
+
         var promiseArr = templates.map(function(template) {
             return action(template);
         });
+
+        console.log("regular promise map", promiseArr);
 
         return Promise.all(promiseArr);
     }

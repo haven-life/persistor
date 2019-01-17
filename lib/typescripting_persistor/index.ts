@@ -3,13 +3,13 @@ var nextId = 1;
 var objectTemplate;
 
 import {PersistObjectTemplate} from './PersistObjectTemplate';
-import * as supertype from 'supertype';
+import { ObjectTemplate } from 'supertype'
 
-export default function start(baseClassForPersist: typeof supertype.default) {
-    let PersistorOT = new PersistObjectTemplate();
+export default function start(baseClassForPersist: typeof ObjectTemplate) {
+    let PersistorOT = PersistObjectTemplate.initialize(baseClassForPersist);
 
-    require('./api.js')(PersistorOT, baseClassForPersist);
-    require('./schema.js')(PersistorOT);
+    // require('./api.js')(PersistorOT, baseClassForPersist); - done
+    // require('./schema.js')(PersistorOT);
     require('./util.js')(PersistorOT);
     require('./mongo/query.js')(PersistorOT);
     require('./mongo/update.js')(PersistorOT);
@@ -20,8 +20,6 @@ export default function start(baseClassForPersist: typeof supertype.default) {
 
     return  PersistorOT; 
 }
-
-let ObjectTemplate = supertype.default;
 
 export class Persistor { // for tests only
     static create() {

@@ -3,13 +3,15 @@
 import { Supertype } from 'supertype';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
 import { UtilityFunctions } from './UtilityFunctions';
+import { ObjectID } from 'mongodb';
 
+
+export type Constructor<T> = new(...args) => T;
 export type PersistentConstructor = typeof Persistent;
 
 export class Persistent extends Supertype {
 
     __template__: typeof Persistent;
-
     _id: string;
     __version__: number;
     amorphic: Persistor;
@@ -47,8 +49,11 @@ export class Persistent extends Supertype {
     * @param {JSON} query @TODO
     * @param {JSON} options @TODO
     * @returns {*}
+    * 
+    * static find<T extends BaseEntity>(this: ObjectType<T>, options?: FindManyOptions<T>): Promise<T[]>;
+
     */
-    static async persistorFetchByQuery(query, options?) {
+    static async persistorFetchByQuery (query, options?) {
         PersistObjectTemplate._validateParams(options, 'fetchSchema', this);
 
         options = options || {};
@@ -84,7 +89,6 @@ export class Persistent extends Supertype {
             // This used to be options.logger || PersistObjectTemplate.logger
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, 'persistorFetchByQuery');
         }
-
     }
 
     /**
@@ -399,7 +403,7 @@ export class Persistent extends Supertype {
 
         let id;
         if (dbType == persistObjectTemplate.DB_Mongo) {
-            id = persistObjectTemplate.ObjectID(this._id.toString())
+            id = new ObjectID(this._id.toString())
         }
         else {
             id = this._id;
@@ -471,6 +475,7 @@ export class Persistent extends Supertype {
     * @returns {object}
     * @deprecated in favor of persistorFetchWithQuery
     */
+
     static async getFromPersistWithQuery(query, cascade?, start?, limit?, isTransient?, idMap?, options?, logger?) {
         const usedLogger = logger ? logger : PersistObjectTemplate.logger;
 

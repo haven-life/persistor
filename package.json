@@ -13,16 +13,19 @@
         "q": "1.x",
         "supertype": "github:haven-life/supertype#bug/fixing-decorator-supertypeclass",
         "tv4": "^1.2.7",
-        "underscore": "1.x"
+        "underscore": "1.x",
+        "uuid": "^3.3.2"
     },
     "devDependencies": {
         "@types/bluebird": "*",
         "@types/chai": "^3.4.34",
         "@types/knex": "^0.15.1",
         "@types/mocha": "^2.2.39",
+        "@types/mongodb": "^3.1.19",
         "@types/node": "^7.0.5",
         "@types/q": "*",
         "@types/underscore": "*",
+        "@types/uuid": "^3.4.4",
         "chai": "3.x",
         "chai-as-promised": "^5.1.0",
         "eslint": "3.7.x",

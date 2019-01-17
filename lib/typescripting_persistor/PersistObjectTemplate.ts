@@ -5,7 +5,6 @@ import { ObjectTemplate } from 'supertype';
 import * as knex from 'knex';
 import { PersistentConstructor } from './Persistent';
 import { Schema } from './Schema';
-
 type Transaction = {
     id: number,
     dirtyObjects: Object,
@@ -33,12 +32,18 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static __defaultTransaction__: Transaction;
     static _schema: any;
     static noAutoIndex: any;
-
     static __dictionary__: {[key: string]: PersistentConstructor};
 
+
+    // @TODO: remove for uuid
+    // static objId = ObjectID;
+
+
+    // @TODO: Does this even need to be passed in? Can we just use the reference to ObjectTemplate here
     static initialize(baseClassForPersist: typeof ObjectTemplate) {
         this.init();
         this.baseClassForPersist = baseClassForPersist;
+        return this;
     }
 
     /**

@@ -3,6 +3,23 @@ import { PersistObjectTemplate } from './PersistObjectTemplate';
 import { Persistent } from './Persistent';
 import { ObjectID } from 'mongodb';
 export namespace UtilityFunctions {
+
+    export function getCollectionByObject(persistor: typeof PersistObjectTemplate, obj) {
+        const dbAlias = UtilityFunctions.getDBAlias(obj.__template__.__collection__);
+        const db = UtilityFunctions.getDB(persistor, dbAlias).connection;
+        const dealias = UtilityFunctions.dealias(obj.__template__.__collection__);
+
+        return db.collection(dealias);
+    }
+
+    export function getCollectionByTemplate(persistor: typeof PersistObjectTemplate, template) {
+        const dbAlias = UtilityFunctions.getDBAlias(template.__collection__);
+        const db = UtilityFunctions.getDB(persistor, dbAlias).connection;
+        const dealias = UtilityFunctions.dealias(template.__collection__);
+
+        return db.collection(dealias);
+    }
+
     export function processTemplate(template, persistorProps) {
 
         let props = template.getProperties();
@@ -227,7 +244,7 @@ export namespace UtilityFunctions {
         return collection.match(/(.*)\//) ? RegExp.$1 : '__default__'
     }
 
-    export function getDBID (masterId) {
+    export function getDBID (masterId?) {
         if (!masterId) {
             return new ObjectID();
         }

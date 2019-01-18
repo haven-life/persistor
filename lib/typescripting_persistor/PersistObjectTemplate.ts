@@ -34,6 +34,8 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static noAutoIndex: any;
     static __dictionary__: {[key: string]: PersistentConstructor};
 
+    static _id: any;
+
 
     // @TODO: remove for uuid
     // static objId = ObjectID;

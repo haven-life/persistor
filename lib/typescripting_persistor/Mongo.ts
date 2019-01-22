@@ -433,12 +433,192 @@ export namespace Mongo {
     // PersistObjectTemplate.getFromPersistWithMongoId 
     export async function findById (persistor: typeof PersistObjectTemplate, template, id, cascade, isTransient, idMap, _logger) {
         const objectId = new ObjectID(id.toString());
-        const results = await getFromPersistWithMongoQuery(template, {_id: objectId}, cascade, null, null, isTransient, idMap)
-        
+        const results = await findByQuery(persistor, template, {_id: objectId}, cascade, null, null, isTransient, idMap)
+
         return results[0];
     };
 
+    // getFromPersistWithQuery
+    export async function findByQuery(persistor: typeof PersistObjectTemplate, template, query, cascade, skip, limit, isTransient, idMap, options?, logger?) {
+        idMap = idMap || {};
+        options = options || {};
+        if (typeof(skip) != 'undefined')
+            options.skip = skip * 1;
+        if (typeof(limit) != 'undefined')
+            options.limit = limit * 1;
+        if (template.__schema__.subDocumentOf) {
+            var subQuery = createSubDocQuery(query, template, logger);
+            return this.getPOJOFromMongoQuery(template, subQuery.query, options, logger).then(function(pojos) {
+                var promises = [];
+                var results = [];
+                for (var ix = 0; ix < pojos.length; ++ix) {
 
+                    // Populate the idMap for any references
+                    if (!idMap[pojos[ix]._id.toString()]) {
+                        var topType = this.getTemplateByCollection(template.__collection__);
+                        this.getTemplateFromMongoPOJO(pojos[ix], topType, promises, {type: topType}, idMap, {},
+                            null, null, isTransient)
+                    }
+                    var subPojos = this.getPOJOSFromPaths(template, subQuery.paths, pojos[ix], query);
+                    for (var jx = 0; jx < subPojos.length; ++jx) {
+                        promises.push(this.getTemplateFromMongoPOJO(subPojos[jx], template, null, null, idMap, cascade, null, null, isTransient, logger).then(function (pojo) {
+                            results.push(pojo);
+                        }));
+                    }
+                }
+                return this.resolveRecursivePromises(promises, results);
+            }.bind(this));
+        } else
+            return this.getPOJOFromMongoQuery(template, query, options, logger).then(function(pojos)
+            {
+                var promises = [];
+                var results = [];
+                for (var ix = 0; ix < pojos.length; ++ix)
+                    (function () {
+                        var cix = ix;
+                        promises.push(this.getTemplateFromMongoPOJO(pojos[ix], template, null, null, idMap, cascade, null, null, isTransient, logger).then(function (obj) {
+                            results[cix] = obj;
+                        }))
+                    }.bind(this))();
+                return this.resolveRecursivePromises(promises, results);
+
+            }.bind(this));
+    }
+
+    function isObjectID (elem) {
+        return elem &&  (elem instanceof ObjectID || elem._bsontype)
+    }
+
+    function traverse(templates, targetTemplate, paths, template, queryString) {
+        var props = template.getProperties();
+        for (var prop in props) {
+            var defineProperty = props[prop];
+            var propTemplate = defineProperty.of || defineProperty.type;
+            if (propTemplate && propTemplate.__name__ &&
+                !templates[template.__name__ + '.' + prop] && propTemplate.__schema__ && propTemplate.__schema__.subDocumentOf) {
+                if (propTemplate == targetTemplate)
+                    paths.push(queryString + prop);
+                templates[template.__name__ + '.' + prop] = true;
+                traverse(templates, targetTemplate, paths, propTemplate, queryString + prop + '.')
+            }
+        }
+    }
+        
+
+    function queryTraverse(path, newQuery, query) {
+        for (var prop in query) {
+            var newProp = path + '.' + prop;
+            var elem = query[prop];
+
+            if (prop.match(/\$(gt|lt|gte|lte|ne|in)/i)) {
+                newQuery[prop] = elem;
+            }
+            else if (typeof (elem) == 'string' || typeof(elem) == 'number' || isObjectID(elem)) {
+                newQuery[newProp] = elem;
+            }
+            else if (elem instanceof Array) { // Should be for $and and $or
+                newQuery[prop] = [];
+                for (var ix = 0; ix < elem.length; ++ix) {
+                    newQuery[prop][ix] = {}
+                    queryTraverse(path, newQuery[prop][ix], elem[ix]);
+                }
+            } else { // this would be for sub-doc exact matches which is unlikely but possible
+                newQuery[newProp] = {};
+                queryTraverse(path, newQuery[newProp], elem)
+            }
+        }
+    }
+
+    /**
+     * Create a query for a sub document by find the top level document and traversing to all references
+     * building up the query object in the process
+     * @param {object} targetQuery - the query where this not a sub-document (e.g. key: value)
+     * @param {object} targetTemplate - the template to which it applies
+     * @param {object} logger object template logger
+     * @returns {*}
+     */
+    export function createSubDocQuery (targetQuery, targetTemplate, logger) {
+        var topTemplate = targetTemplate.__topTemplate__;
+
+        // Build up an array of string paths that traverses down to the desired template
+        const paths = [];
+        var templates = {};
+        traverse(templates, targetTemplate, paths, topTemplate, '');
+        // Walk through the expression substituting the path for any refs
+        var results = {paths: [], query: {'$or' : []}};
+        for (var ix = 0; ix < paths.length; ++ix)
+        {
+            var path = paths[ix];
+            results.paths.push(path);
+            var newQuery = {};
+
+            paths[ix] = {};
+            if (targetQuery) {
+                queryTraverse(newQuery, targetQuery);
+                results.query['$or'].push(newQuery);
+                (logger || this.logger).debug({component: 'persistor', module: 'query', activity: 'processing'}, 'subdocument query for ' + targetTemplate.__name__ + '; ' + JSON.stringify(results.query));
+            }
+        }
+        return results;
+    }
+
+
+      /**
+     * Extract query and options out of cascade spec and return new subordinate cascade spec
+     *
+     * @param {object} query to fill in
+     * @param {object} options to fill in
+     * @param {object} parameterFetch options specified in call
+     * @param {object} schemaFetch options specified in schema
+     * @param {object} propertyFetch options specified in template
+     * @returns {{}}
+     */
+
+    // processCascade
+    export async function processCascade(query, options, parameterFetch, schemaFetch, propertyFetch) {
+
+        var fetch: any = {}; // Merge fetch specifications in order of priority
+        var prop;
+
+        if (propertyFetch) {
+            for (prop in propertyFetch) {
+                fetch[prop] = propertyFetch[prop];
+            }
+        }
+
+        if (schemaFetch) {
+            for (prop in schemaFetch) {
+                fetch[prop] = schemaFetch[prop];
+            }
+        }
+
+        if (parameterFetch) {
+            for (prop in parameterFetch) {
+                fetch[prop] = parameterFetch[prop];
+            }
+        }
+
+        var newCascade = {}; // Split out options, query and cascading fetch
+
+        for (var option in fetch)
+            switch (option)
+            {
+            case 'fetch':
+                newCascade = fetch.fetch;
+                break;
+
+            case 'query':
+                for (prop in fetch.query) {
+                    query[prop] = fetch.query[prop];
+                }
+                break;
+
+            default:
+                options[option] = fetch[option];
+
+            }
+        return newCascade;
+    }
 
     /**
      * Remove objects from a collection/table
@@ -451,7 +631,7 @@ export namespace Mongo {
 
     // deleteFromPersistWithMongoQuery
     export async function deleteByQuery(persistor: typeof PersistObjectTemplate, template, query, logger) {
-        const objs = await getFromPersistWithMongoQuery(template, query, undefined, undefined, undefined, undefined, undefined, undefined, logger);
+        const objs = await findByQuery(template, query, undefined, undefined, undefined, undefined, undefined, undefined, logger);
 
         const deleted = objs.map(async (obj) => await obj.persistDelete());
 

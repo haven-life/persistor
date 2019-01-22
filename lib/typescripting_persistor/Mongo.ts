@@ -124,6 +124,8 @@ export namespace Mongo {
      * @param {Object} txn - uses persistobjecttemplate properties
      * @param {Object} logger = objecttemplate logger
      * @returns {POJO}
+     * 
+     * persistSaveMongo
      */
     export async function persistSave(persistor: typeof PersistObjectTemplate, obj, promises, masterId, idMap, txn, logger?) {
         if (!obj.__template__) {
@@ -308,7 +310,7 @@ export namespace Mongo {
                                         component: 'persistor', module: 'update.persistSaveMongo',
                                         activity: 'processing'
                                     }, prop + ' waiting for placement, ebmed as subdocument');
-                                    values.push(persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
+                                    values.push(await persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
                                 }
                                 // If it was this placed another document or another place in our document
                                 // we don't add it as a sub-document
@@ -316,7 +318,7 @@ export namespace Mongo {
                                     value[ix]._id.replace(/:.*/, '') != masterId))          // or in another doc
                                 {
                                     if (value[ix].__dirty__) // If dirty save it
-                                        promises.push(persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
+                                        promises.push(await persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
                                     continue;  // Skip saving it as a sub-doc
                                 }
                                 // Save as sub-document
@@ -324,12 +326,12 @@ export namespace Mongo {
                                     component: 'persistor', module: 'update.persistSaveMongo',
                                     activity: 'processing'
                                 }, 'Saving subdocument ' + prop);
-                                values.push(persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
+                                values.push(await persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
                             } else {
                                 if (value[ix]._id && idMap[value[ix]._id.toString()]) // Previously referenced objects just get the id
                                     values.push(value[ix]._id.toString());
                                 else // Otherwise recursively obtain pojo
-                                    values.push(persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
+                                    values.push(await persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
                             }
 
                         }
@@ -351,7 +353,7 @@ export namespace Mongo {
                                     component: 'persistor', module: 'update.persistSaveMongo',
                                     activity: 'processing'
                                 }, 'Saving ' + prop + ' as document because we updated it\'s foreign key');
-                                promises.push(persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
+                                promises.push(await persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
                             }
                         }
                 }
@@ -371,13 +373,14 @@ export namespace Mongo {
 
                     // otherwise as long as in same collection just continue saving the sub-document
                     else if (defineProperty.type.__collection__ == collection)
-                        pojo[foreignKey] = persistSave(persistor, value, promises, masterId, idMap, txn, logger);
+                        pojo[foreignKey] = await persistSave(persistor, value, promises, masterId, idMap, txn, logger);
 
                     // If an a different collection we have to get the id generated
                     else {
                         // This should cause an id to be generated eventually
-                        promises.push(persistSave(persistor, value, promises, null, idMap, txn, logger));
+                        promises.push(await persistSave(persistor, value, promises, null, idMap, txn, logger));
                         // If it is not generated then queue up a function to set it when we get 'round to it
+
                         (function () {
                             var closureId = value._id;
                             var closurePojo = pojo;
@@ -410,7 +413,7 @@ export namespace Mongo {
                     }
                     pojo[foreignKey] = value ? new ObjectID(obj[foreignKey]) : null;
                     if (value && value.__dirty__)
-                        promises.push(persistSave(persistor, value, promises, null, idMap, txn, logger));
+                        promises.push(await persistSave(persistor, value, promises, null, idMap, txn, logger));
                 }
             }
             else if (defineProperty.type == Date)
@@ -420,76 +423,557 @@ export namespace Mongo {
         }
 
         if (savePOJO)
-            promises.push(save(persistor, obj, pojo, isDocumentUpdate ? new ObjectID(obj._id) : null, txn, logger));
-        if (resolvePromises)
-            return UtilityFunctions.resolveRecursivePromises(promises, pojo).then(function (pojo) {
-                pojo._id = obj._id;
-                return pojo;
-            });
+            promises.push(await save(persistor, obj, pojo, isDocumentUpdate ? new ObjectID(obj._id) : null, txn, logger));
+
+
+        if (resolvePromises) {
+            const resolvedPojo = await UtilityFunctions.resolveRecursivePromises(promises, pojo);
+            resolvedPojo._id = obj._id;
+            return resolvedPojo;
+        }
         else
-            return pojo;
+            return await pojo;
     }
 
+    // Query.ts
+
     // PersistObjectTemplate.getFromPersistWithMongoId 
-    export async function findById (persistor: typeof PersistObjectTemplate, template, id, cascade, isTransient, idMap, _logger) {
+    export async function findById(persistor: typeof PersistObjectTemplate, template, id, cascade, isTransient, idMap, _logger) {
         const objectId = new ObjectID(id.toString());
-        const results = await findByQuery(persistor, template, {_id: objectId}, cascade, null, null, isTransient, idMap)
+        const results = await findByQuery(persistor, template, { _id: objectId }, cascade, null, null, isTransient, idMap)
 
         return results[0];
     };
 
-    // getFromPersistWithQuery
+    // getFromPersistWithMongoQuery @TODO: come back to this later
     export async function findByQuery(persistor: typeof PersistObjectTemplate, template, query, cascade, skip, limit, isTransient, idMap, options?, logger?) {
         idMap = idMap || {};
         options = options || {};
-        if (typeof(skip) != 'undefined')
+        if (typeof (skip) != 'undefined')
             options.skip = skip * 1;
-        if (typeof(limit) != 'undefined')
+        if (typeof (limit) != 'undefined')
             options.limit = limit * 1;
         if (template.__schema__.subDocumentOf) {
-            var subQuery = createSubDocQuery(query, template, logger);
-            return this.getPOJOFromMongoQuery(template, subQuery.query, options, logger).then(function(pojos) {
-                var promises = [];
-                var results = [];
-                for (var ix = 0; ix < pojos.length; ++ix) {
+            var subQuery = createSubDocQuery(persistor, query, template, logger);
+            const pojos: any[] = await getPOJOByQuery(persistor, template, subQuery.query, options, logger);
 
-                    // Populate the idMap for any references
-                    if (!idMap[pojos[ix]._id.toString()]) {
-                        var topType = this.getTemplateByCollection(template.__collection__);
-                        this.getTemplateFromMongoPOJO(pojos[ix], topType, promises, {type: topType}, idMap, {},
-                            null, null, isTransient)
-                    }
-                    var subPojos = this.getPOJOSFromPaths(template, subQuery.paths, pojos[ix], query);
-                    for (var jx = 0; jx < subPojos.length; ++jx) {
-                        promises.push(this.getTemplateFromMongoPOJO(subPojos[jx], template, null, null, idMap, cascade, null, null, isTransient, logger).then(function (pojo) {
-                            results.push(pojo);
-                        }));
+            // var promises = [];
+            var results = [];
+            let totalPromises: Promise<any>[];
+            let index = 0;
+            const promises = pojos.map(async (pojo, ix) => {
+
+                // Populate the idMap for any references
+                if (!idMap[pojo._id.toString()]) {
+                    var topType = UtilityFunctions.getTemplateByCollection(persistor, template.__collection__);
+                    await getTemplateFromPOJO(persistor, pojo, topType, promises, { type: topType }, idMap, {}, null, null, isTransient)
+                }
+                var subPojos = getPOJOSFromPaths(persistor, template, subQuery.paths, pojo, query);
+
+                const subPromises = subPojos.map( async (subPojo, jx) => {
+                    const gotTemplate = await getTemplateFromPOJO(persistor, subPojo, template, null, null, idMap, cascade, null, null, isTransient, logger);
+                    results.push(gotTemplate);
+                });
+
+                return await Promise.all(subPromises);
+            });
+            
+            return UtilityFunctions.resolveRecursivePromises(promises, results);
+        } else {
+            const pojos: any[] = await getPOJOByQuery(persistor, template, query, options, logger);
+            var results = [];
+
+            // can replace this with map;
+            const promises = pojos.map(async (pojo, index) => {
+                const obj = await getTemplateFromPOJO(persistor, pojo, template, null, null, idMap, cascade, null, null, isTransient, logger);
+                results[index] = obj;
+            });
+
+            return UtilityFunctions.resolveRecursivePromises(promises, results);
+        }
+    }
+
+    /**
+     * Enriches a "Plane Old JavaScript Object (POJO)" by creating it using the new Operator
+     * so that all prototype information such as functions are created. It will reconstruct
+     * references one-to-one and one-two-many by reading them from the database
+     *  *
+     * @param {object} pojo is the unadorned object
+     * @param {object} template is the template used to create the object
+     * @param {object} promises Array of pending requests
+     * @param {object} defineProperty {@TODO need to check}
+     * @param {object} idMap object mapper for cache
+     * @param {object} cascade fetch spec.
+     * @param {object} establishedObj {@TODO need to review, used for amorphic}
+     * @param {unknown} specificProperties {@TODO need to review}
+     * @param {bool} isTransient unknown.
+     * @param {object} logger object template logger
+     * @returns {*} an object via a promise as though it was created with new template()
+     * 
+     * getTemplateFromMongoPOJO
+     */
+
+    export async function getTemplateFromPOJO(persistor: typeof PersistObjectTemplate, pojo, template, promises, defineProperty, idMap, cascade, establishedObj, specificProperties, isTransient, logger?) {
+
+        // For reco
+        // rding back refs
+        if (!idMap) {
+            throw new Error('Missing idMap on getTemplateFromPOJO (mongo)');
+        }
+        var topLevel = false;
+        if (!promises) {
+            topLevel = true;
+            promises = [];
+        }
+
+        // Create the new object with correct constructor using embedded ID if ObjectTemplate
+        const templateId = `persist${template.__name__}-${pojo._template.replace(/.*:/, '')}-${pojo._id.toString()}`;
+        var obj = establishedObj || idMap[pojo._id.toString()] || persistor._createEmptyObject(template, templateId, defineProperty);
+
+        // Once we find an object already fetch that is not transient query as normal for the rest
+        if (!obj.__transient__ && !establishedObj && !isTransient)
+            isTransient = false;
+
+        var collection = obj.__template__.__collection__;
+        var schema = obj.__template__.__schema__;
+
+        var id = null;
+        if (pojo._id) { // If object is persistent make sure id is a string and in map
+            id = pojo._id;
+            obj._id = id.toString();
+
+            // If we have a real value and an array of value store functions, call them
+            if (idMap[id.toString()] && idMap[id.toString()] instanceof Array)
+                for (var fx = 0; fx < idMap[id.toString()].length; ++fx)
+                    idMap[id.toString()][fx].call(null, obj);
+
+            idMap[id.toString()] = obj;
+        }
+        if (pojo.__version__)
+            obj.__version__ = pojo.__version__;
+
+        function copyProps(obj) {
+            var newObj = {};
+            for (var prop in obj)
+                newObj[prop] = obj[prop];
+            return newObj;
+        }
+
+        // Go through all the properties and transfer them to newly created object
+        var props = specificProperties || obj.__template__.getProperties();
+        var ix, options, cascadeFetchProp, query;
+        for (var prop in props) {
+            //if (prop.match(/Persistor$/))
+            //    continue;
+
+            var value = pojo[prop];
+            defineProperty = props[prop];
+            var type = defineProperty.type;
+            var isCrossDocRef = Schema.isCrossDocRef(persistor, obj.__template__, prop, defineProperty) || defineProperty.autoFetch;
+            var cascadeFetch = (cascade && cascade[prop]) ? cascade[prop] : null;
+            var doFetch = defineProperty['fetch'] || cascadeFetch;
+
+            var persistorPropertyName = prop + 'Persistor';
+            obj[persistorPropertyName] = obj[persistorPropertyName] || { count: 0 };
+
+            // Make sure this is property is persistent and that it has a value.  We have to skip
+            // undefined values in case a new property is added so it can retain it's default value
+            if (!UtilityFunctions._persistProperty(persistor, defineProperty) || !defineProperty.enumerable ||
+                (!isCrossDocRef && (typeof (value) == 'undefined')))
+                continue;
+            if (!type)
+                throw new Error(obj.__template__.__name__ + '.' + prop + ' has no type decleration');
+
+            if (type == Array) {
+                // If type of pojo
+                if (!defineProperty.of.__collection__)
+                    obj[prop] = value;
+                // If this is in the same entity just copy over
+                else if (!isCrossDocRef) {
+                    obj[prop] = [];
+                    for (ix = 0; ix < pojo[prop].length; ++ix) {
+                        // Did we get a value ?
+                        if (pojo[prop][ix]) {
+
+                            // is it a cached id reference
+                            if (typeof (pojo[prop][ix]) == 'string') {
+                                // If nothing in the map create an array
+                                if (!idMap[pojo[prop][ix]])
+                                    idMap[pojo[prop][ix]] = [];
+
+                                // If an array of value store functions add ours to the list
+                                if (idMap[pojo[prop][ix]] instanceof Array)
+                                    (function () {
+                                        var closureIx = ix;
+                                        var closureProp = prop;
+                                        idMap[pojo[prop][ix]].push(function (value) {
+                                            pojo[closureProp][closureIx] = value;
+                                        });
+                                    })()
+                                else
+                                    obj[prop][ix] = idMap[pojo[prop][ix]];
+                            } else {
+                                options = defineProperty.queryOptions || {};
+                                cascadeFetchProp = processCascade(query, options, cascadeFetch, null, defineProperty.fetch);
+                                obj[prop][ix] = idMap[pojo[prop][ix]._id.toString()] ||
+                                    getTemplateFromPOJO(persistor, pojo[prop][ix], defineProperty.of, promises, defineProperty, idMap,
+                                        cascadeFetchProp, null, null, isTransient, logger);
+                            }
+                        } else
+                            obj[prop][ix] = null;
                     }
                 }
-                return this.resolveRecursivePromises(promises, results);
-            }.bind(this));
-        } else
-            return this.getPOJOFromMongoQuery(template, query, options, logger).then(function(pojos)
-            {
-                var promises = [];
-                var results = [];
-                for (var ix = 0; ix < pojos.length; ++ix)
+                // Otherwise this is a database reference and we have to find the collection of kids
+                else {
+                    var self = this;
                     (function () {
-                        var cix = ix;
-                        promises.push(this.getTemplateFromMongoPOJO(pojos[ix], template, null, null, idMap, cascade, null, null, isTransient, logger).then(function (obj) {
-                            results[cix] = obj;
-                        }))
-                    }.bind(this))();
-                return this.resolveRecursivePromises(promises, results);
+                        var closurePersistorProp = persistorPropertyName;
+                        var closureOf = defineProperty.of;
+                        var closureDefineProperty = defineProperty;
+                        var closureIsSubDoc = !!closureDefineProperty.of.__schema__.subDocumentOf;
+                        if (closureIsSubDoc) {
+                            obj[closurePersistorProp] = copyProps(obj[closurePersistorProp]);
+                        } else
+                            promises.push(self.countFromMongoQuery(closureOf, query).then(function (count) {
+                                obj[closurePersistorProp].count = count;
+                                obj[closurePersistorProp] = copyProps(obj[closurePersistorProp]);
+                            }));
+                    })();
+                    if (doFetch) {
+                        query = {};
+                        options = {};
+                        if (id) {
+                            if (!schema || !schema.children || !schema.children[prop])
+                                throw new Error(obj.__template__.__name__ + '.' + prop + ' is missing a children schema entry');
+                            var foreignKey = schema.children[prop].id;
+                            query[foreignKey] = id.toString().match(/:/) ? id.toString() : new ObjectID(id.toString());
+                        }
+                        (logger || persistor.logger).debug({ component: 'persistor', module: 'query.getTemplateFromPOJO', activity: 'pre' },
+                            'fetching ' + prop + ' cascading ' + JSON.stringify(cascadeFetch) + ' ' + JSON.stringify(query) + ' ' + JSON.stringify(options));
+                        self = persistor;
+                        (function () {
+                            var closureProp = prop;
+                            var closureOf = defineProperty.of;
+                            var closurePersistorProp = persistorPropertyName
+                            var closureCascade = processCascade(query, options, cascadeFetch,
+                                (schema && schema.children) ? schema.children[prop].fetch : null, defineProperty.fetch);
+                            var closureDefineProperty = defineProperty;
+                            var closureIsSubDoc = !!closureDefineProperty.of.__schema__.subDocumentOf;
+                            obj[closureProp] = [];
 
-            }.bind(this));
+                            // For subdocs we have to build up a query to fetch all docs with these little buggers
+                            if (closureIsSubDoc) {
+                                var closureOrigQuery = query;
+                                var results = createSubDocQuery(persistor, query, closureDefineProperty.of, logger);
+                                query = results.query;
+                                var closurePaths = results.paths;
+                            }
+                            promises.push(getPOJOByQuery(persistor, defineProperty.of, query, options, logger).then(function (pojos) {
+                                // For subdocs we have to fish them out of the documents making sure the query matches
+                                if (closureIsSubDoc) {
+                                    obj[closureProp] = [];
+                                    for (var ix = 0; ix < pojos.length; ++ix) {
+                                        // Populate the idMap for any references
+                                        if (!idMap[pojos[ix]._id.toString()]) {
+                                            var topType = getTemplateByCollection(closureOf.__collection__);
+                                            await getTemplateFromPOJO(persistor, pojos[ix], topType, promises, { type: topType }, idMap, {},
+                                                null, null, isTransient, logger)
+                                        }
+                                        // Grab the actual Pojos since may not be avail from processing parent
+                                        var subPojos = getPOJOSFromPaths(defineProperty.of, closurePaths, pojos[ix], closureOrigQuery)
+                                        for (var jx = 0; jx < subPojos.length; ++jx)
+                                            // Take them from cache or fetch them
+                                            obj[closureProp].push((!closureCascade && idMap[subPojos[jx]._id.toString()]) ||
+                                            await getTemplateFromPOJO(persistor, subPojos[jx], closureDefineProperty.of,
+                                                    promises, closureDefineProperty, idMap, closureCascade, null, null, isTransient, logger));
+                                    }
+                                } else
+                                    for (ix = 0; ix < pojos.length; ++ix) {
+                                        // Return cached one over freshly read
+                                        obj[closureProp][ix] = idMap[pojos[ix]._id.toString()] ||
+                                        await getTemplateFromPOJO(persistor, pojos[ix], closureDefineProperty.of,
+                                                promises, closureDefineProperty, idMap, closureCascade, null, null, isTransient, logger)
+                                    }
+                                obj[closurePersistorProp].isFetched = true;
+                                obj[closurePersistorProp].start = options ? options.start || 0 : 0;
+                                obj[closurePersistorProp].next = obj[closurePersistorProp].start + pojos.length;
+                                obj[closurePersistorProp] = copyProps(obj[closurePersistorProp]);
+                                return Promise.resolve(true); // Say we done
+                            }));
+                        }.bind(this))();
+                    } else
+                        obj[persistorPropertyName].isFetched = false;
+                    obj[persistorPropertyName] = copyProps(obj[persistorPropertyName]);
+                }
+
+            } else if (type.isObjectTemplate) {
+                // Same collection suck in from idMap if previously referenced or process pojo
+                if (type.__collection__ == collection && !isCrossDocRef) {
+                    // Did we get a value ?
+                    if (pojo[prop]) {
+
+                        // is it a cached id reference
+                        if (typeof (pojo[prop]) == 'string') {
+                            // If nothing in the map create an array
+                            if (!idMap[pojo[prop]])
+                                idMap[pojo[prop]] = [];
+
+                            // If an array of value store functions add ours to the list
+                            if (idMap[pojo[prop]] instanceof Array)
+                                idMap[pojo[prop]].push(function (value) {
+                                    pojo[prop] = value;
+                                });
+                            else
+                                obj[prop] = idMap[pojo[prop]];
+                        } else {
+                            options = defineProperty.queryOptions || {};
+                            cascadeFetchProp = processCascade(query, options, cascadeFetch, null, defineProperty.fetch);
+
+                            obj[prop] = idMap[pojo[prop]._id.toString()] || await getTemplateFromPOJO(persistor, pojo[prop], type, promises,
+                                defineProperty, idMap, cascadeFetchProp, null, null, isTransient, logger);
+                        }
+
+                    }
+                    else {
+                        obj[prop] = null;
+                    }
+
+                } else // Otherwise read from idMap or query for it
+                {
+                    // Determine the id needed
+                    if (!schema || !schema.parents || !schema.parents[prop] || !schema.parents[prop].id)
+                        throw new Error(obj.__template__.__name__ + '.' + prop + ' is missing a parents schema entry');
+
+                    foreignKey = schema.parents[prop].id;
+
+                    // ID is in pojo or else it was left in the persistor
+                    var foreignId = (pojo[foreignKey] || obj[persistorPropertyName].id || '').toString();
+
+                    // Return copy if already there
+                    if (idMap[foreignId]) {
+                        obj[prop] = idMap[foreignId];
+                        obj[persistorPropertyName].isFetched = true;
+                        obj[persistorPropertyName] = copyProps(obj[persistorPropertyName]);
+                    } else {
+                        if (doFetch) {  // Only fetch ahead if requested
+                            obj[prop] = null;
+                            if (foreignId) {
+                                query = { _id: new ObjectID(foreignId.replace(/:.*/, '')) };
+                                options = {};
+                                (logger || persistor.logger).debug({ component: 'persistor', module: 'query.getTemplateFromMongoPOJ', activity: 'processing' },
+                                    'fetching ' + prop + ' cascading ' + JSON.stringify(cascadeFetch));
+                                self = this;
+                                (function () {
+                                    var closureProp = prop;
+                                    var closureType = type;
+                                    var closurePersistorProp = persistorPropertyName;
+
+                                    var closureCascade = self.processCascade(query, options, cascadeFetch,
+                                        (schema && schema.parents) ? schema.parents[prop].fetch : null, defineProperty.fetch);
+                                    var closureDefineProperty = defineProperty;
+                                    var closureForeignId = foreignId;
+                                    var closureIsSubDoc = !!closureDefineProperty.type.__schema__.subDocumentOf;
+
+                                    // Maybe we already fetched it
+                                    if (idMap[foreignId]) {
+                                        obj[closureProp] = idMap[closureForeignId];
+                                        obj[closurePersistorProp].isFetched = true;
+                                        obj[closurePersistorProp] = copyProps(obj[closurePersistorProp]);
+                                    } else
+
+                                        // Otherwise fetch top level document (which will contain sub-doc if sub-doc)
+                                        promises.push(self.getPOJOFromMongoQuery(closureType, query, undefined, logger).then(function (pojos) {
+
+                                            // Assuming the reference is still there
+                                            if (pojos.length > 0) {
+                                                if (closureIsSubDoc) {
+                                                    // Process the document and the sub-document will end up in idMap
+                                                    if (!idMap[pojos[0]._id.toString()]) {
+                                                        var topType = getTemplateByCollection(closureType.__collection__);
+                                                        await getTemplateFromPOJO(persistor, pojos[0], topType, promises, { type: topType }, idMap, {},
+                                                            null, null, isTransient);
+                                                    }
+                                                    // Get actual sub-doc since it may not yet be available from processing doc
+                                                    var subDocPojo = self.getPOJOSFromPaths(
+                                                        closureType, createSubDocQuery(persistor, null, closureType, logger).paths, pojos[0],
+                                                        { _id: closureForeignId }
+                                                    )[0];
+                                                    // Process actual sub-document to get cascade right and specific sub-doc
+                                                    if (subDocPojo && subDocPojo._id) {
+                                                        if (!idMap[subDocPojo._id.toString()]) {
+                                                            await getTemplateFromPOJO(persistor, subDocPojo, closureType, promises,
+                                                                closureDefineProperty, idMap, closureCascade, null, null, isTransient, logger);
+                                                        }
+                                                    } else {
+                                                        (logger || persistor.logger).debug({ component: 'persistor', module: 'query.getTemplateFromPOJO', activity: 'processing' },
+                                                            'Orphaned subdoc on ' + obj.__template__.__name__ + '[' + closureProp + ':' + obj._id + '] ' +
+                                                            'foreign key: ' + closureForeignId + ' query: ' + JSON.stringify(createSubDocQuery(persistor, null, closureType, logger)));
+                                                    }
+                                                } else
+                                                    if (!idMap[pojos[0]._id.toString()])
+                                                        await getTemplateFromPOJO(persistor, pojos[0], closureType, promises,
+                                                            closureDefineProperty, idMap, closureCascade, null, null, isTransient, logger);
+                                            }
+                                            obj[closureProp] = idMap[closureForeignId];
+                                            obj[closurePersistorProp].isFetched = true;
+                                            obj[closurePersistorProp] = copyProps(obj[closurePersistorProp]);
+                                            return Promise.resolve(true);
+                                        }.bind(self)));
+                                })();
+                            } else {
+                                obj[persistorPropertyName].isFetched = true;
+                                obj[persistorPropertyName] = copyProps(obj[persistorPropertyName]);
+                            }
+                        } else {
+                            obj[persistorPropertyName].isFetched = false;
+                            obj[persistorPropertyName].id = foreignId;
+                            obj[persistorPropertyName] = copyProps(obj[persistorPropertyName]);
+                        }
+                    }
+                }
+            } else
+                if (typeof (pojo[prop]) != 'undefined') {
+                    if (type == Date)
+                        obj[prop] = pojo[prop] ? new Date(pojo[prop]) : null;
+                    else if (type == Number)
+                        obj[prop] = (!pojo[prop] && pojo[prop] !== 0) ? null : pojo[prop] * 1;
+                    else if (type == Boolean)
+                        obj[prop] = (pojo[prop] === true || pojo[prop] === 'true') ? true : ((pojo[prop] === false || pojo[prop] === 'false') ? false : null)
+                    else
+                        obj[prop] = pojo[prop];
+                }
+        }
+        if (topLevel)
+            return await UtilityFunctions.resolveRecursivePromises(promises, obj);
+        else
+            return obj;
     }
 
-    function isObjectID (elem) {
-        return elem &&  (elem instanceof ObjectID || elem._bsontype)
+    function matches(pojo, query, ...args)
+    {
+        var allFound = true;
+        var ix;
+        for (var prop in query) {
+            if (prop.toLowerCase() == '$and')
+            {
+                var allFoundAnd = true;
+                for (ix = 0; ix < query[prop].length; ++ix)
+                    if (matches(pojo, query[prop][ix])) {allFoundAnd = false}
+                if (allFoundAnd)
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$or')
+            {
+                var oneFoundOr = false;
+                for (ix = 0; ix < query[prop].length; ++ix)
+                    if (matches(pojo, query[prop][ix])) {oneFoundOr = true;}
+                if (!oneFoundOr)
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$in')
+            {
+                var isIn = false;
+                for (ix = 0; ix < query[prop].length; ++ix)
+                    if (query[prop][ix] == pojo)
+                        isIn = true;
+                if (!isIn)
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$nin')
+            {
+                var notIn = true;
+                for (ix = 0; ix < query[prop].length; ++ix)
+                    if (query[prop][ix] == pojo)
+                        notIn = false;
+                if (notIn)
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$gt')
+            {
+                if (!(pojo > query[prop]))
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$gte')
+            {
+                if (!(pojo >= query[prop]))
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$lt')
+            {
+                if (!(pojo < query[prop]))
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$lte')
+            {
+                if (!(pojo <= query[prop]))
+                    allFound = false;
+            }
+            else if (prop.toLowerCase() == '$ne')
+            {
+                if (!(pojo != query[prop]))
+                    allFound = false;
+            }
+            else if (pojo[prop] && typeof(query[prop]) != 'string' && typeof(query[prop]) != 'number'  && !(pojo[prop] instanceof ObjectID))
+            {
+                // Sub doc all must be true
+                if (!matches(pojo[prop], query[prop], false))
+                    allFound = false;
+            } else
+            {
+                // Otherwise the value must match
+                if (!pojo[prop] || pojo[prop].toString() != query[prop].toString())
+                    allFound = false;
+            }
+        }
+        return allFound;
     }
 
-    function traverse(templates, targetTemplate, paths, template, queryString) {
+    function traverse(pathparts, query, pojos, ref, level) {
+        if (level == pathparts.length) {
+            if (matches(ref, query)) {
+                pojos.push(ref);
+            }
+        }
+        else {
+            ref = ref[pathparts[level]];
+            if (ref instanceof Array)
+                for (var jx = 0; jx < ref.length; ++jx)
+                    traverse(pathparts, query, pojos, ref[jx], level + 1)
+            else if (ref)
+                traverse(pathparts, query, pojos, ref, level + 1);   
+        }
+    }
+
+    
+    /**
+     * Traverse a pojo returned form MongoDB given a set of paths and locate the sub-document
+     * matching it on the original query
+     * @param {object} _template is the template used to create the object
+     * @param {object} paths {@TODO need to verify}
+     * @param {object} pojo {@TODO need to verify}
+     * @param {object} query mongo style query.
+     * @returns {Array}
+     * 
+     * getPOJOsFromPaths
+     */
+    export function getPOJOSFromPaths (persistor: typeof PersistObjectTemplate, _template, paths, pojo, query)
+    {
+        var pathparts;
+        var pojos = [];
+        for (var ix = 0; ix < paths.length; ++ix) {
+            pathparts = paths[ix].split('.');
+            traverse(pathparts, query, pojos, pojo, 0);
+        }
+        return pojos;
+    };
+
+
+
+    function isObjectID(elem) {
+        return elem && (elem instanceof ObjectID || elem._bsontype)
+    }
+
+    function traverseProps(templates, targetTemplate, paths, template, queryString) {
         var props = template.getProperties();
         for (var prop in props) {
             var defineProperty = props[prop];
@@ -499,11 +983,11 @@ export namespace Mongo {
                 if (propTemplate == targetTemplate)
                     paths.push(queryString + prop);
                 templates[template.__name__ + '.' + prop] = true;
-                traverse(templates, targetTemplate, paths, propTemplate, queryString + prop + '.')
+                traverseProps(templates, targetTemplate, paths, propTemplate, queryString + prop + '.')
             }
         }
     }
-        
+
 
     function queryTraverse(path, newQuery, query) {
         for (var prop in query) {
@@ -513,7 +997,7 @@ export namespace Mongo {
             if (prop.match(/\$(gt|lt|gte|lte|ne|in)/i)) {
                 newQuery[prop] = elem;
             }
-            else if (typeof (elem) == 'string' || typeof(elem) == 'number' || isObjectID(elem)) {
+            else if (typeof (elem) == 'string' || typeof (elem) == 'number' || isObjectID(elem)) {
                 newQuery[newProp] = elem;
             }
             else if (elem instanceof Array) { // Should be for $and and $or
@@ -537,45 +1021,52 @@ export namespace Mongo {
      * @param {object} logger object template logger
      * @returns {*}
      */
-    export function createSubDocQuery (targetQuery, targetTemplate, logger) {
+    export function createSubDocQuery(persistor: typeof PersistObjectTemplate, targetQuery, targetTemplate, logger) {
         var topTemplate = targetTemplate.__topTemplate__;
 
         // Build up an array of string paths that traverses down to the desired template
         const paths = [];
         var templates = {};
-        traverse(templates, targetTemplate, paths, topTemplate, '');
+        traverseProps(templates, targetTemplate, paths, topTemplate, '');
         // Walk through the expression substituting the path for any refs
-        var results = {paths: [], query: {'$or' : []}};
-        for (var ix = 0; ix < paths.length; ++ix)
-        {
+
+        var results = { paths: [], query: { '$or': [] } };
+        for (var ix = 0; ix < paths.length; ++ix) {
             var path = paths[ix];
             results.paths.push(path);
             var newQuery = {};
 
             paths[ix] = {};
             if (targetQuery) {
-                queryTraverse(newQuery, targetQuery);
+                queryTraverse(path, newQuery, targetQuery);
                 results.query['$or'].push(newQuery);
-                (logger || this.logger).debug({component: 'persistor', module: 'query', activity: 'processing'}, 'subdocument query for ' + targetTemplate.__name__ + '; ' + JSON.stringify(results.query));
+                const usedLogger = logger || persistor.logger;
+                usedLogger.debug(
+                    { 
+                        component: 'persistor',
+                        module: 'query',
+                        activity: 'processing'
+                    },
+                    `Subdocument query for ${targetTemplate.__name__}; ${JSON.stringify(results.query)}`);
             }
         }
         return results;
     }
 
 
-      /**
-     * Extract query and options out of cascade spec and return new subordinate cascade spec
-     *
-     * @param {object} query to fill in
-     * @param {object} options to fill in
-     * @param {object} parameterFetch options specified in call
-     * @param {object} schemaFetch options specified in schema
-     * @param {object} propertyFetch options specified in template
-     * @returns {{}}
-     */
+    /**
+   * Extract query and options out of cascade spec and return new subordinate cascade spec
+   *
+   * @param {object} query to fill in
+   * @param {object} options to fill in
+   * @param {object} parameterFetch options specified in call
+   * @param {object} schemaFetch options specified in schema
+   * @param {object} propertyFetch options specified in template
+   * @returns {{}}
+   */
 
     // processCascade
-    export async function processCascade(query, options, parameterFetch, schemaFetch, propertyFetch) {
+    export function processCascade(query, options, parameterFetch, schemaFetch, propertyFetch) {
 
         var fetch: any = {}; // Merge fetch specifications in order of priority
         var prop;
@@ -601,20 +1092,19 @@ export namespace Mongo {
         var newCascade = {}; // Split out options, query and cascading fetch
 
         for (var option in fetch)
-            switch (option)
-            {
-            case 'fetch':
-                newCascade = fetch.fetch;
-                break;
+            switch (option) {
+                case 'fetch':
+                    newCascade = fetch.fetch;
+                    break;
 
-            case 'query':
-                for (prop in fetch.query) {
-                    query[prop] = fetch.query[prop];
-                }
-                break;
+                case 'query':
+                    for (prop in fetch.query) {
+                        query[prop] = fetch.query[prop];
+                    }
+                    break;
 
-            default:
-                options[option] = fetch[option];
+                default:
+                    options[option] = fetch[option];
 
             }
         return newCascade;
@@ -647,8 +1137,8 @@ export namespace Mongo {
      * @returns {object} commandresult of mongo client
      */
 
-     // deleteFromPersistWithMongoId
-    export async function deleteById (persistor: typeof PersistObjectTemplate, template, id, logger) {
+    // deleteFromPersistWithMongoId
+    export async function deleteById(persistor: typeof PersistObjectTemplate, template, id, logger) {
         return deleteByQuery(persistor, template, { _id: new ObjectID(id.toString()) }, logger);
     }
 }

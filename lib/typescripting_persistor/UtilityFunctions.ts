@@ -208,7 +208,7 @@ export namespace UtilityFunctions {
         }
     }
 
-    export function _persistProperty(persistor: typeof PersistObjectTemplate, defineProperty) {
+    export function _persistProperty(defineProperty) {
         if (defineProperty.persist == false || defineProperty.isLocal == true) {
             return false;
         }

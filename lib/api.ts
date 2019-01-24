@@ -850,7 +850,8 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
         var prefix = PersistObjectTemplate.dealias(template.__collection__);
         return dbType == PersistObjectTemplate.DB_Mongo ?
             PersistObjectTemplate.getPOJOFromMongoQuery(template, query, options, logger) :
-            PersistObjectTemplate.getPOJOsFromKnexQuery(template, [], query, options, undefined, logger).then(function (pojos) {
+            // TODO NICK why do we need to pass in an empty array here??
+            PersistObjectTemplate.getPOJOsFromKnexQuery(PersistObjectTemplate, template, [], query, options, undefined, logger).then(function (pojos) {
                 pojos.forEach(function (pojo) {
                     _.map(pojo, function(_val, prop) {
                         if (prop.match(RegExp('^' + prefix + '___'))) {

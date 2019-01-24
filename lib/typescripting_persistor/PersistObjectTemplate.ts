@@ -36,10 +36,8 @@ export class PersistObjectTemplate extends ObjectTemplate {
 
     static _id: any;
 
-
     // @TODO: remove for uuid
     // static objId = ObjectID;
-
 
     // @TODO: Does this even need to be passed in? Can we just use the reference to ObjectTemplate here
     static initialize(baseClassForPersist: typeof ObjectTemplate) {

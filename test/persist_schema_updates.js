@@ -329,11 +329,11 @@ describe('schema update checks', function () {
 
 
     it('drop an index if exits', function () {
-        return PersistObjectTemplate.DropIfKnexIndexExists(SingleIndexTable, 'idx_singleindextable_id_name').should.eventually.have.property('command').that.match(/DROP|ALTER/);
+        return PersistObjectTemplate.dropIfKnexIndexExists(SingleIndexTable, 'idx_singleindextable_id_name').should.eventually.have.property('command').that.match(/DROP|ALTER/);
     });
 
     it('drop an index which does not exists to check the exception', function () {
-        return PersistObjectTemplate.DropIfKnexIndexExists(SingleIndexTable, 'notavailable').should.be.rejectedWith(Error);
+        return PersistObjectTemplate.dropIfKnexIndexExists(SingleIndexTable, 'notavailable').should.be.rejectedWith(Error);
     });
 
     it('create a table with multiple indexes', function () {

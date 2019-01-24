@@ -78,7 +78,7 @@ export namespace Mongo {
     }
 
     // countFromMongoQuery
-    export async function countByQuery(persistor: typeof PersistObjectTemplate, template, query) {
+    export async function countByQuery(persistor: typeof PersistObjectTemplate, template, query, logger?) {
         const collection = UtilityFunctions.getCollectionByTemplate(persistor, template);
 
         return await collection.count(query);
@@ -97,7 +97,7 @@ export namespace Mongo {
 
         const query = { _id: new ObjectID(id) };
 
-        const pojos = await getPOJOByQuery(persistor, template, query, idMap);
+        const pojos = await persistor.getPOJOFromQuery(template, query, idMap);
 
         if (pojos.length > 0) {
             return pojos[0];
@@ -725,7 +725,7 @@ export namespace Mongo {
                     } else {
                         obj[persistorPropertyName].isFetched = false;
                     }
-                    
+
                     obj[persistorPropertyName] = copyProps(obj[persistorPropertyName]);
                 }
 

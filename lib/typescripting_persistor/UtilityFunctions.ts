@@ -4,6 +4,20 @@ import { Persistent } from './Persistent';
 import { ObjectID } from 'mongodb';
 export namespace UtilityFunctions {
 
+    export function getDBType(persistor: typeof PersistObjectTemplate, collection) {
+        const dbAlias = UtilityFunctions.getDBAlias(collection);
+        return UtilityFunctions.getDB(persistor, dbAlias).type;
+    }
+
+    export function isDBMongo(persistor: typeof PersistObjectTemplate, collection) {
+        const dbType = getDBType(persistor, collection);
+        return dbType == persistor.DB_Mongo;
+    }
+
+    export function isDBKnex(persistor: typeof PersistObjectTemplate, collection) {
+        return !isDBMongo(persistor, collection);
+    }
+
     export function getCollectionByObject(persistor: typeof PersistObjectTemplate, obj) {
         const dbAlias = UtilityFunctions.getDBAlias(obj.__template__.__collection__);
         const db = UtilityFunctions.getDB(persistor, dbAlias).connection;
@@ -133,7 +147,7 @@ export namespace UtilityFunctions {
                 callback(obj);
 
                 const props = obj.__template__.getProperties();
-                _.map(props, (defineProperty, prop) => {
+                _.map(props, (defineProperty: any, prop) => {
 
                     const idMapEntry = `${obj.__id__}_${prop}`;
 
@@ -225,11 +239,11 @@ export namespace UtilityFunctions {
 
         let index = alias || '__default__';
 
-        if (!this._db[index]) {
+        if (!persistor._db[index]) {
             throw new Error(`DB Alias ${index} not set with corresponding UtilityFunctions.setDB(db, type, alias)`);
         }
 
-        return this._db[index];
+        return persistor._db[index];
     }
 
     export function dealias(collection) {

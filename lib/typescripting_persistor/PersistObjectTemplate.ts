@@ -5,6 +5,9 @@ import { ObjectTemplate } from 'supertype';
 import * as knex from 'knex';
 import { PersistentConstructor } from './Persistent';
 import { Schema } from './Schema';
+import { SchemaValidator } from './SchemaValidator';
+import { UtilityFunctions } from './UtilityFunctions';
+import { Mongo } from './Mongo';
 type Transaction = {
     id: number,
     dirtyObjects: Object,
@@ -35,6 +38,10 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static __dictionary__: {[key: string]: PersistentConstructor};
 
     static _id: any;
+    static deletedObjects: any;
+    static __transient__: boolean;
+    static objectMap: boolean;
+    static __changeTracking__: boolean;
 
     // @TODO: remove for uuid
     // static objId = ObjectID;
@@ -286,7 +293,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
         }
     }
 
-    static setAsDeleted(obj, txn?, onlyIfChanged?) {
+    static setAsDeleted(obj, txn?, onlyIfChanged?, ...args) {
         // Get array references too
         if (onlyIfChanged && this.MarkChangedArrayReferences) {
             this.MarkChangedArrayReferences();
@@ -353,16 +360,16 @@ export class PersistObjectTemplate extends ObjectTemplate {
      * @param {json} options - sort, limit, and offset options
      * @param {ObjectTemplate.logger} logger - objecttemplate logger
      * @returns {*}
+     * 
+     * @TODO: remove circular ref to this
      * */
     static async getPOJOFromQuery  (template, query, options?, logger?) {
-        const dbAlias = this.getDBAlias(template.__collection__);
-        const dbType = this.getDB(dbAlias).type;
         
         const prefix = this.dealias(template.__collection__);
         
         let pojos;
-        if (dbType == PersistObjectTemplate.DB_Mongo) {
-            pojos = await this.getPOJOFromMongoQuery(template, query, options, logger);
+        if (UtilityFunctions.isDBMongo(this, __template__.__collection__)) {
+            pojos = await Mongo.getPOJOByQuery(this, template, query, options, logger);
         }
         else {
             pojos = await this.getPOJOsFromKnexQuery(template, [], query, options, undefined, logger);
@@ -405,7 +412,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
     }
 
     static async commit(options?) {
-        PersistObjectTemplate._validateParams(options, 'commitSchema');
+        SchemaValidator.validate(options, 'commitSchema');
 
         options = options || {};
         var logger = options.logger || PersistObjectTemplate.logger;

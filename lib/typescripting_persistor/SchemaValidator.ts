@@ -113,7 +113,7 @@ export namespace SchemaValidator {
     }
 
     // PersistObjectTemplate._validFetchSpecs
-    function validateFetchSpec(persistor: typeof PersistObjectTemplate, template, options) {
+    function validateFetchSpec(template, options) {
         let validSpecs = validateFetchSpecsRef || {};
         //if the fetch spec currently used for the same template is already used, no need to valid again..
 
@@ -131,7 +131,7 @@ export namespace SchemaValidator {
     }
 
     // _validateParams
-    export function validate (persistor: typeof PersistObjectTemplate, options, schema, template) {
+    export function validate (options, schema, template?) {
         if (options) {
 
             if (!schemaValidator.validate(options, schemas[schema])) {
@@ -142,8 +142,8 @@ export namespace SchemaValidator {
                 throw new Error(errMessage);
             }
 
-            if (schema === 'fetchSchema' && !!options.fetch) {
-                validateFetchSpec(persistor, template, options);
+            if (template && schema === 'fetchSchema' && !!options.fetch) {
+                validateFetchSpec(template, options);
             }
         }
     }

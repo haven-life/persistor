@@ -4,6 +4,8 @@ import { Supertype } from 'supertype';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
 import { UtilityFunctions } from './UtilityFunctions';
 import { ObjectID } from 'mongodb';
+import { SchemaValidator } from './SchemaValidator';
+import { Mongo } from './Mongo';
 
 
 export type Constructor<T> = new(...args) => T;
@@ -14,9 +16,10 @@ export class Persistent extends Supertype {
     __template__: typeof Persistent;
     _id: string;
     __version__: number;
-    amorphic: Persistor;
+    amorphic: typeof PersistObjectTemplate;
     static __collection__: any;
     static __schema__: any;
+    static __table__: any;
 
     // New names
 
@@ -30,14 +33,12 @@ export class Persistent extends Supertype {
     * @returns {Object}
     */
     static async persistorDeleteByQuery(query, options?) {
-        PersistObjectTemplate._validateParams(options, 'persistSchema', this);
+        SchemaValidator.validate(options, 'persistSchema', this);
         options = options || {};
+        const persistorRef = PersistObjectTemplate;
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
-        if (dbType == PersistObjectTemplate.DB_Mongo) {
-            return await PersistObjectTemplate.deleteFromPersistWithMongoQuery(this, query, options.logger); //@TODO: this doesn't check if logger is set like the others
+        if (UtilityFunctions.isDBMongo(persistorRef, this.__collection__)) {
+            return await Mongo.deleteByQuery(persistorRef, this, query, options.logger); //@TODO: this doesn't check if logger is set like the others
         }
         else {
             return await PersistObjectTemplate.deleteFromKnexByQuery(this, query, options.transaction, options.logger);
@@ -54,7 +55,7 @@ export class Persistent extends Supertype {
 
     */
     static async persistorFetchByQuery (query, options?) {
-        PersistObjectTemplate._validateParams(options, 'fetchSchema', this);
+        SchemaValidator.validate(options, 'fetchSchema', this);
 
         options = options || {};
         var persistObjectTemplate = options.session || PersistObjectTemplate;
@@ -70,8 +71,6 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = persistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = persistObjectTemplate.getDB(dbAlias).type;
 
         // If we are using order, but not sort. Probably to handle an older version of sort
         if (options.order && !options.order.sort) {
@@ -79,11 +78,11 @@ export class Persistent extends Supertype {
         }
 
         try {
-            if (dbType == persistObjectTemplate.DB_Mongo) {
-                return await persistObjectTemplate.getFromPersistWithMongoQuery(this, query, options.fetch, options.start, options.limit, options.transient, options.order, options.order, usedLogger);
+            if (UtilityFunctions.isDBMongo(persistObjectTemplate, this.__collection__)) {
+                return await Mongo.findByQuery(persistObjectTemplate, this, query, options.fetch, options.start, options.limit, options.transient, options.order, options.order, usedLogger);
             }
             else {
-                return await persistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, options.fetch, options.start, options.limit, options.transient, null, options.order, undefined, undefined, usedLogger, options.enableChangeTracking, options.projection));
+                return await persistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, options.fetch, options.start, options.limit, options.transient, null, options.order, undefined, undefined, usedLogger, options.enableChangeTracking, options.projection);
             }
         } catch (err) {
             // This used to be options.logger || PersistObjectTemplate.logger
@@ -99,7 +98,7 @@ export class Persistent extends Supertype {
     * @returns {Number}
     */
     static async persistorCountByQuery(query, options?) {
-        PersistObjectTemplate._validateParams(options, 'fetchSchema', this);
+        SchemaValidator.validate(options, 'fetchSchema', this);
 
         options = options || {};
         const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
@@ -110,21 +109,17 @@ export class Persistent extends Supertype {
                 activity: 'getFromPersistWithQuery',
                 data:
                 {
-                    template: template.__name__
+                    template: this.__name__
                 }
             });
 
-
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
-
+        const persistor = PersistObjectTemplate;
         try {
-            if (dbType == PersistObjectTemplate.DB_Mongo) {
-                return await PersistObjectTemplate.countFromMongoQuery(this, query, usedLogger);
+            if (UtilityFunctions.isDBMongo(persistor, this.__collection__)) {
+                return await Mongo.countByQuery(persistor, this, query, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger))
+                return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, { activity: 'persistorCountByQuery' });
@@ -138,7 +133,7 @@ export class Persistent extends Supertype {
     * @returns {*}
     */
     static async persistorFetchById(id, options?) { // @TODO: Legacy <--- Ask srksag what this is for
-        PersistObjectTemplate._validateParams(options, 'fetchSchema', this);
+        SchemaValidator.validate(options, 'fetchSchema', this);
 
         options = options || {};
 
@@ -177,10 +172,7 @@ export class Persistent extends Supertype {
     * @returns {boolean}
     */
     static persistorIsKnex(): boolean {
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
-        return dbType != PersistObjectTemplate.DB_Mongo;
+        return UtilityFunctions.isDBKnex(PersistObjectTemplate, this.__collection__);
     }
 
     /**
@@ -189,7 +181,7 @@ export class Persistent extends Supertype {
     * @returns {string}
     */
     static persistorGetTableName(alias?: string): string {
-        const tableName = PersistObjectTemplate.dealias(this.__table__);
+        const tableName = UtilityFunctions.dealias(this.__table__);
         const ifAlias = alias ? ` as ${alias}` : ``;
 
         return `${tableName}${ifAlias}`;
@@ -227,9 +219,8 @@ export class Persistent extends Supertype {
     * @returns {*}
     */
     static persistorGetKnex() {
-        const tableName = PersistObjectTemplate.dealias(this.__table__);
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__table__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
+        const tableName = UtilityFunctions.dealias(this.__table__);
+        const dbType = UtilityFunctions.getDBType(PersistObjectTemplate, this.__table__);
 
         return dbType.connection(tableName);
     }
@@ -278,7 +269,7 @@ export class Persistent extends Supertype {
     }
 
     async persistorFetchReferences(options) {
-        PersistObjectTemplate._validateParams(options, 'fetchSchema', this.__template__);
+        SchemaValidator.validate(options, 'fetchSchema', this.__template__);
 
         options = options || {};
 
@@ -302,11 +293,8 @@ export class Persistent extends Supertype {
             properties[prop] = objectProperties[prop];
         }
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
-        if (dbType == PersistObjectTemplate.DB_Mongo) {
-            return await PersistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, {}, options.fetch, this, properties, options.transient, usedLogger);
+        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
+            return await Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, {}, options.fetch, this, properties, options.transient, usedLogger);
         }
         else {
             return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, {}, options.fetch, options.transient, null, this, properties, undefined, undefined, undefined, usedLogger)
@@ -314,7 +302,7 @@ export class Persistent extends Supertype {
     }
 
     async persistorSave(options?) {
-        PersistObjectTemplate._validateParams(options, 'persistSchema', this.__template__);
+        SchemaValidator.validate(options, 'persistSchema', this.__template__);
 
         options = options || {};
         var txn = PersistObjectTemplate.getCurrentOrDefaultTransaction(options.transaction);
@@ -356,12 +344,9 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
         //return this.__template__.getFromPersistWithId(this._id, null, null, null, true, logger)
-        if (dbType == PersistObjectTemplate.DB_Mongo) {
-            return await PersistObjectTemplate.getFromPersistWithMongoId(this.__template__, this._id, null, null, null, usedLogger);
+        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
+            return await Mongo.findById(PersistObjectTemplate, this.__template__, this._id, null, null, null, usedLogger);
         }
         else {
             return await PersistObjectTemplate.getFromPersistWithKnexId(this.__template__, this._id, null, null, null, true, usedLogger);
@@ -370,10 +355,10 @@ export class Persistent extends Supertype {
     
     // persistorDelete will only support new API calls.
     async persistorDelete(options?) { 
-        PersistObjectTemplate._validateParams(options, 'persistSchema', this.__template__);
+        SchemaValidator.validate(options, 'persistSchema', this.__template__);
 
         options = options || {};
-        var txn = PersistObjectTemplate.getCurrentOrDefaultTransaction(options.transaction);
+        var txn = UtilityFunctions.getCurrentOrDefaultTransaction(PersistObjectTemplate, options.transaction);
         var cascade = options.cascade;
         const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
 
@@ -398,11 +383,9 @@ export class Persistent extends Supertype {
     }
     async persistorIsStale() {
         const persistObjectTemplate = PersistObjectTemplate;
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
 
         let id;
-        if (dbType == persistObjectTemplate.DB_Mongo) {
+        if (UtilityFunctions.isDBMongo(persistObjectTemplate, this.__template__.__collection__)) {
             id = new ObjectID(this._id.toString())
         }
         else {
@@ -445,13 +428,10 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
         // @TODO: double or triple equals here, ask srksag
         try {
-            if (dbType == PersistObjectTemplate.DB_Mongo) {
-                return await PersistObjectTemplate.getFromPersistWithMongoId(this, id, cascade, isTransient, idMap, logger);
+            if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
+                return await Mongo.findById(PersistObjectTemplate, this, id, cascade, isTransient, idMap, logger);
             }
             else {
                 return await PersistObjectTemplate.getFromPersistWithKnexId(this, id, cascade, isTransient, idMap, isRefresh, logger);
@@ -490,12 +470,9 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
         try {
-            if (dbType == PersistObjectTemplate.DB_Mongo) {
-                return await PersistObjectTemplate.getFromPersistWithMongoQuery(this, query, cascade, start, limit, isTransient, idMap, options, logger);
+            if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
+                return await Mongo.findByQuery(PersistObjectTemplate, this, query, cascade, start, limit, isTransient, idMap, options, logger);
             }
             else {
                 return await PersistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, cascade, start, limit, isTransient, idMap, options, undefined, undefined, logger);
@@ -518,11 +495,8 @@ export class Persistent extends Supertype {
      * @TODO: No error handling here or logging here, talk to srksag
      */
     static async deleteFromPersistWithQuery(query, txn?, logger?) {
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
-        if (dbType == PersistObjectTemplate.DB_Mongo) {
-            return await PersistObjectTemplate.deleteFromPersistWithMongoQuery(this, query, logger);
+        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
+            return await Mongo.deleteByQuery(PersistObjectTemplate, this, query, logger);
         }
         else {
             return await PersistObjectTemplate.deleteFromKnexQuery(this, query, txn, logger);
@@ -552,15 +526,12 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
         try {
-            if (dbType == PersistObjectTemplate.DB_Mongo) {
-                return await PersistObjectTemplate.deleteFromPersistWithMongoId(template, id, usedLogger);
+            if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
+                return await Mongo.deleteById(PersistObjectTemplate, this, id, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.deleteFromKnexId(template, id, txn, usedLogger);
+                return await PersistObjectTemplate.deleteFromKnexId(this, id, txn, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, id, { activity: 'deleteFromPersistWithId' });
@@ -588,12 +559,10 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
 
         try {
-            if (dbType == PersistObjectTemplate.DB_Mongo) {
-                return await PersistObjectTemplate.countFromMongoQuery(this, query, usedLogger);
+            if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
+                return await Mongo.countByQuery(PersistObjectTemplate, this, query, usedLogger);
             }
             else {
                 return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger);
@@ -630,11 +599,8 @@ export class Persistent extends Supertype {
         var cascadeTop = {};
         cascadeTop[prop] = cascade || true;
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
-        if (dbType == PersistObjectTemplate.DB_Mongo) {
-            return await PersistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, idMap, cascadeTop, this, properties, isTransient, usedLogger);
+        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
+            return await Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, idMap, cascadeTop, this, properties, isTransient, usedLogger);
         }
         else {
             return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascadeTop, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
@@ -662,16 +628,13 @@ export class Persistent extends Supertype {
             properties[prop] = objectProperties[prop];
         }
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
 
         var previousDirtyTracking = PersistObjectTemplate.__changeTracking__;
         PersistObjectTemplate.__changeTracking__ = false;
 
         try {
-            if (dbType == PersistObjectTemplate.DB_Mongo) {
-                return await PersistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, idMap, cascade, this, properties, isTransient, usedLogger);
+            if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
+                return await Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, idMap, cascade, this, properties, isTransient, usedLogger);
             }
             else {
                 return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascade, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
@@ -715,22 +678,19 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
-
         //@TODO: Ask srksag how come there's no catch for errors here
 
-        if (dbType == persistObjectTemplate.DB_Mongo) {
-            const returnVal = await persistObjectTemplate.persistSaveMongo(this, undefined, undefined, undefined, txn, logger)
+        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
+            const returnVal = await Mongo.persistSave(PersistObjectTemplate, this, undefined, undefined, undefined, txn, logger)
             if (txn) {
-                persistObjectTemplate.saved(returnVal, txn); //@TODO: might need to await here
+                UtilityFunctions.saved(PersistObjectTemplate, returnVal, txn); //@TODO: might need to await here
             }
             return await returnVal._id.toString(); //@TODO: do we need to await here? we already awaited returnval
         }
         else {
             const returnVal = await persistObjectTemplate.persistSaveKnex(this, txn, logger);
             if (txn) {
-                persistObjectTemplate.saved(returnVal, txn);  //@TODO: might need to await here
+                UtilityFunctions.saved(PersistObjectTemplate, returnVal, txn);
             }
 
             return await returnVal._id.toString(); //@TODO: do we need to await here? we already awaited returnval
@@ -753,23 +713,21 @@ export class Persistent extends Supertype {
                     id: this.__id__
                 }
             });
-        const dbAlias = PersistObjectTemplate.getDBAlias(this.__template__.__collection__);
-        const dbType = PersistObjectTemplate.getDB(dbAlias).type;
 
         //@TODO: Ask srksag how come there's no catch for errors here
 
-        if (dbType == persistObjectTemplate.DB_Mongo) {
-            return await persistObjectTemplate.persistSaveMongo(this, undefined, undefined, undefined, txn, logger);
+        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
+            return await Mongo.persistSave(PersistObjectTemplate, this, undefined, undefined, undefined, txn, logger);
         }
         else {
-            return persistObjectTemplate.persistTouchKnex(this, txn, logger);
+            return await persistObjectTemplate.persistTouchKnex(this, txn, logger);
         }
     }
 
     //persistDelete is modified to support both legacy and V2, options this is passed for V2 as the first parameter.
 
     // Legacy
-    persistDelete(txn?, logger?) {
+    async persistDelete(txn?, logger?) {
 
         if (!txn || (txn && txn.knex && txn.knex.transacting)) {
 
@@ -841,7 +799,7 @@ export class Persistent extends Supertype {
     * @returns
     * @memberof Persistent
     */
-    static protected _injectProperties() {
+   protected static _injectProperties() {
         if (this.hasOwnProperty('__propertiesInjected__'))
             return;
         const props = this.defineProperties;
@@ -852,7 +810,7 @@ export class Persistent extends Supertype {
             const refType = of || type;
 
             let template = this;
-            if (refType && refType.isObjectTemplate && PersistObjectTemplate._persistProperty(defineProperty)) {
+            if (refType && refType.isObjectTemplate && UtilityFunctions._persistProperty(PersistObjectTemplate, defineProperty)) {
                 var isCrossDocRef = PersistObjectTemplate.isCrossDocRef(template, prop, defineProperty)
                 if (isCrossDocRef || defineProperty.autoFetch) {
                     (function () {

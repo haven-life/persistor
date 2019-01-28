@@ -1,8 +1,12 @@
 import * as _ from 'underscore';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
-import { Persistent } from './Persistent';
+import {Persistent, PersistentConstructor} from './Persistent';
 import { ObjectID } from 'mongodb';
 export namespace UtilityFunctions {
+
+    export function getKnexConnection(persistor: typeof PersistObjectTemplate, template: PersistentConstructor) {
+        return UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection;
+    }
 
     export function getDBType(persistor: typeof PersistObjectTemplate, collection) {
         const dbAlias = UtilityFunctions.getDBAlias(collection);

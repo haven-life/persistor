@@ -1,28 +1,28 @@
 // third party modules
 import * as _ from 'underscore';
-
+import * as knexImport from 'knex';
 // internal modules
 import { UtilityFunctions } from './UtilityFunctions';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
 
+
 export namespace Knex {
-    export function getPOJOsFromKnexQuery(persistor: typeof PersistObjectTemplate, template, joins, queryOrChains, options, map, customLogger, projection?) {
+    export async function getPOJOsFromKnexQuery(persistor: typeof PersistObjectTemplate, template, joins, queryOrChains, options, map, customLogger, projection?) {
 
         const logger = customLogger || this.logger;
-
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection(tableName);
+        const queryBuilder = (UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection as knexImport)(tableName);
 
         const columnNames = getColumnNames(persistor, template, joins, projection);
 
         // tack on outer joins.  All our joins are outerjoins and to the right.  There could in theory be
         // foreign keys pointing to rows that no longer exists
-        let select = knex.select(columnNames).from(tableName);
+        let select = queryBuilder.select(columnNames).from(tableName);
 
-        joins.forEach(function forAllJoins(join) {
-            select = select.leftOuterJoin(UtilityFunctions.dealias(join.template.__table__) + ' as ' + join.alias,
-                join.alias + '.' + join.parentKey,
-                UtilityFunctions.dealias(template.__table__) + '.' + join.childKey);
+        joins.forEach((join) => {
+            const joinTableName = UtilityFunctions.dealias(join.template.__table__);
+            const tableName = UtilityFunctions.dealias(template.__table__);
+            select = select.leftOuterJoin(`${joinTableName} as ${join.alias}`, `${join.alias}.${join.parentKey}`, `${tableName}.${join.childKey}`);
         });
 
         // execute callback to chain on filter functions or convert mongo style filters
@@ -36,10 +36,10 @@ export namespace Knex {
         }
 
         if (options && options.sort) {
-            const ascending = [];
+            const ascending: string[] = [];
             const descending = [];
 
-            _.each(options.sort, function sort(value, key) {
+            _.each(options.sort, (value, key) => {
                 if (value > 0) {
                     ascending.push(tableName + '.' + key);
                 }
@@ -48,6 +48,7 @@ export namespace Knex {
                 }
             });
 
+            // @TODO: ask srksag about conflicting types
             if (ascending.length) {
                 select = select.orderBy(ascending);
             }
@@ -60,19 +61,30 @@ export namespace Knex {
             select = select.limit(options.limit);
             select = select.offset(0)
         }
+
         if (options && options.offset) {
             select = select.offset(options.offset);
         }
 
-        logger.debug({component: 'persistor', module: 'db.getPOJOsFromKnexQuery', activity: 'pre',
-            data: {template: template.__name__, query: queryOrChains}});
+        logger.debug(
+            {
+                component: 'persistor',
+                module: 'db.getPOJOsFromKnexQuery',
+                activity: 'pre',
+                data: {
+                    template: template.__name__,
+                    query: queryOrChains
+                }
+            });
 
         const selectString = select.toString();
 
         if (map && map[selectString]) {
-            return new Promise(function (resolve) {
-                map[selectString].push(resolve);
-            });
+            // @TODO: what's going on here
+            return map[selectString].push(await Promise.resolve());
+            // return new Promise(function (resolve) {
+            //     map[selectString].push(resolve);
+            // });
         }
 
         if (map) {
@@ -111,7 +123,7 @@ export namespace Knex {
      * @param {object} _logger objecttemplate logger
      * @returns {*}
      */
-    export function countFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, _logger) {
+    export async function countFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, _logger) {
         const tableName = UtilityFunctions.dealias(template.__table__);
         const knex = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection(tableName);
         // execute callback to chain on filter functions or convert mongo style filters
@@ -120,9 +132,8 @@ export namespace Knex {
         else if (queryOrChains)
             (this.convertMongoQueryToChains)(tableName, knex, queryOrChains);
 
-        return knex.count('_id').then(function (ret) {
-            return ret[0].count * 1;
-        });
+        const countResult = await knex.count('_id')
+        return countResult[0].count * 1;
     }
 
     /**
@@ -132,10 +143,11 @@ export namespace Knex {
      * @param {string} tableName table to search on the database.
      * @returns {*}
      */
-    export function checkForKnexTable(persistor: typeof PersistObjectTemplate, template, tableName) {
+    export async function checkForKnexTable(persistor: typeof PersistObjectTemplate, template, tableName): Promise<boolean> {
         tableName = tableName ? tableName : this.dealias(template.__table__);
-        const knex = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection;
-        return knex.schema.hasTable(tableName);
+        const knexInstance = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection as knexImport;
+
+        return await knexInstance.schema.hasTable(tableName);
     }
 
     /**
@@ -146,12 +158,11 @@ export namespace Knex {
      */
     export function checkForKnexColumnType(persistor: typeof PersistObjectTemplate, template, column) {
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection;
+        const knexInstance = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection as knexImport;
 
-        return knex(tableName).columnInfo(column)
-            .then(function(column) {
-                return column.type;
-            });
+        const columnMetaData = await knexInstance(tableName).columnInfo(column);
+
+        return columnMetaData.type;
     }
 
     /**
@@ -160,22 +171,24 @@ export namespace Knex {
      * @param {string} indexName index name to drop
      * @constructor
      */
-    export function dropIfKnexIndexExists(persistor: typeof PersistObjectTemplate, template, indexName) {
+    export async function dropIfKnexIndexExists(persistor: typeof PersistObjectTemplate, template, indexName) {
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection;
+        const knex = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection as knexImport;
 
         if (indexName.indexOf('idx_') === -1) {
-            indexName = 'idx_' + tableName + '_' + indexName;
+            indexName = `idx_${tableName}_indexName`;
         }
-
-        return knex.schema.table(tableName, function (table) {
-            table.dropIndex([], indexName);
-        })
-            .catch(function (_error) {
-                return knex.schema.table(tableName, function (table) {
-                    table.dropUnique([], indexName);
+        
+        try {
+            return await knex.schema.table(tableName, (table) => {
+                table.dropIndex([], indexName);
             });
-        });
+        }
+        catch (err) {
+            return await knex.schema.table(tableName, (table) => {
+                table.dropUnique([], indexName);
+            })
+        }
     }
 
     /**
@@ -189,9 +202,10 @@ export namespace Knex {
      */
     export function deleteFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, txn, _logger) {
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection;
+        const knex = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection as knexImport;
 
         if (txn && txn.knex) {
+            // Compiler error @TODO:???
             knex.transacting(txn.knex);
         }
 
@@ -212,12 +226,12 @@ export namespace Knex {
         txn.deleteQueries = deleteQueries;
     }
 
-    export function knexPruneOrphans (persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger) {
+    export function knexPruneOrphans (persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger?) {
         const template = obj.__template__;
         const defineProperty = template.getProperties()[property];
 
         const tableName = UtilityFunctions.dealias(template.__table__);
-        let knex = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection;
+        let knex: knexImport.QueryBuilder = UtilityFunctions.getDB(persistor, this.getDBAlias(template.__table__)).connection as knexImport; // should be Knex instance
 
         if (txn && txn.knex) {
             knex.transacting(txn.knex);
@@ -241,6 +255,27 @@ export namespace Knex {
 
         return knex;
     };
+
+
+        /**
+     * Delete a Row
+     *
+     * @param {object} template supertype
+     * @param {string} id primary key
+     * @param {object} txn transaction object
+     * @param {object} _logger objecttemplate logger
+     * @returns {*}
+     */
+    export function deleteFromKnexId (template, id, txn, _logger) {
+
+        var tableName = this.dealias(template.__table__);
+        var knex = this.getDB(this.getDBAlias(template.__table__)).connection(tableName);
+        if (txn && txn.knex) {
+            knex.transacting(txn.knex);
+        }
+        return knex.where({_id: id}).delete();
+    };
+
 }
 
 
@@ -298,7 +333,7 @@ function as(persistor, template, prefix, prop, defineProperty, projection, cols)
     const schema = template.__schema__;
     const type = defineProperty.type;
     const of = defineProperty.of;
-    if (!UtilityFunctions._persistProperty(defineProperty) || !defineProperty.enumerable)
+    if (!UtilityFunctions._persistProperty(persistor, defineProperty) || !defineProperty.enumerable)
         return;
     if (type == Array && of.__table__) {
         return;

@@ -278,7 +278,7 @@ export namespace UtilityFunctions {
             return returnValue;
         }
     }
-
+    
     export function getCurrentOrDefaultTransaction (persistor: typeof PersistObjectTemplate, current) {
 
         if (!!current) {
@@ -289,4 +289,60 @@ export namespace UtilityFunctions {
         }
     }
 
+
+    /**
+    * Extract query and options out of cascade spec and return new subordinate cascade spec
+    *
+    * @param {object} query to fill in
+    * @param {object} options to fill in
+    * @param {object} parameterFetch options specified in call
+    * @param {object} schemaFetch options specified in schema
+    * @param {object} propertyFetch options specified in template
+    * @returns {{}}
+    */
+
+    // processCascade
+    export function processCascade(query, options, parameterFetch, schemaFetch, propertyFetch) {
+
+        var fetch: any = {}; // Merge fetch specifications in order of priority
+        var prop;
+
+        if (propertyFetch) {
+            for (prop in propertyFetch) {
+                fetch[prop] = propertyFetch[prop];
+            }
+        }
+
+        if (schemaFetch) {
+            for (prop in schemaFetch) {
+                fetch[prop] = schemaFetch[prop];
+            }
+        }
+
+        if (parameterFetch) {
+            for (prop in parameterFetch) {
+                fetch[prop] = parameterFetch[prop];
+            }
+        }
+
+        var newCascade = {}; // Split out options, query and cascading fetch
+
+        for (var option in fetch)
+            switch (option) {
+                case 'fetch':
+                    newCascade = fetch.fetch;
+                    break;
+
+                case 'query':
+                    for (prop in fetch.query) {
+                        query[prop] = fetch.query[prop];
+                    }
+                    break;
+
+                default:
+                    options[option] = fetch[option];
+
+            }
+        return newCascade;
+    }
 }

@@ -87,8 +87,7 @@ export namespace Knex {
         }
 
         return select
-            .then(processResults.bind(this))
-            .then(processError.bind(this));
+            .then(processResults.bind(this), processError.bind(this));
 
 
         function processResults(res) {
@@ -196,7 +195,7 @@ export namespace Knex {
      */
     export function deleteFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, txn, _logger) {
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getKnexConnection(persistor, template);
+        const knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
             knex.transacting(txn.knex);
@@ -223,7 +222,7 @@ export namespace Knex {
         const template = obj.__template__;
 
         const tableName = UtilityFunctions.dealias(template.__table__);
-        let knex = UtilityFunctions.getKnexConnection(persistor, template);
+        let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
             knex.transacting(txn.knex);
@@ -259,7 +258,8 @@ export namespace Knex {
      * @returns {*}
      */
     export function deleteFromKnexId(persistor: typeof PersistObjectTemplate, template, id, txn, _logger) {
-        let knex = UtilityFunctions.getKnexConnection(persistor, template);
+        const tableName = this.dealias(template.__table__);
+        let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
             knex.transacting(txn.knex);
@@ -277,7 +277,7 @@ export namespace Knex {
      * @param {object} logger objecttemplate logger
      * @returns {*}
      */
-    export function saveKnexPojo(persistor: typeof PersistObjectTemplate, obj, pojo, updateID, txn, logger) {
+    export async function saveKnexPojo(persistor: typeof PersistObjectTemplate, obj, pojo, updateID, txn, logger) {
         const origVer = obj.__version__;
 
         const tableName = UtilityFunctions.dealias(obj.__template__.__table__);
@@ -292,13 +292,13 @@ export namespace Knex {
             knex.transacting(txn.knex)
         }
         if (updateID) {
-            return knex
+            return await knex
                 .where('__version__', '=', origVer).andWhere('_id', '=', updateID)
                 .update(pojo)
                 .then(checkUpdateResults)
                 .then(logSuccess);
         } else {
-            return knex
+            return await knex
                 .insert(pojo)
                 .then(logSuccess);
         }
@@ -332,7 +332,7 @@ export namespace Knex {
      * @param {bool} forceSync forces the function to proceed with sync table step, useful for unit tests.
      * @returns {*}
      */
-    export function synchronizeKnexTableFromTemplate(persistor: typeof PersistObjectTemplate, template: typeof Persistent, changeNotificationCallback, forceSync: boolean) {
+    export async function synchronizeKnexTableFromTemplate(persistor: typeof PersistObjectTemplate, template: typeof Persistent, changeNotificationCallback, forceSync: boolean) {
         const aliasedTableName = template.__table__;
         const tableName = UtilityFunctions.dealias(aliasedTableName);
 
@@ -369,12 +369,12 @@ export namespace Knex {
         const schema = template.__schema__;
         const _newFields = {};
 
-        return buildTable()
+        return await buildTable()
             .then(addComments(tableName))
             .then(synchronizeIndexes(persistor, tableName, template));
 
-        function buildTable() {
-            return knex.schema.hasTable(tableName)
+        async function buildTable() {
+            return await knex.schema.hasTable(tableName)
                 .then((exists) => {
                     // handle error conditions
                     if (!exists) {
@@ -442,11 +442,11 @@ export namespace Knex {
             }
         }
 
-        function addComments(table) {
-            return knex(table).columnInfo().then(function (info) {
+        async function addComments(table) {
+            return knex(table).columnInfo().then(async function (info) {
                 const promises = [];
                 for (const columnName in info) {
-                    const knexCommentPromise = processComment(columnName);
+                    const knexCommentPromise = await processComment(columnName);
                     if (!!knexCommentPromise) {
                         promises.push(knexCommentPromise);
                     }
@@ -454,7 +454,7 @@ export namespace Knex {
                 return Promise.all(promises);
             });
 
-            function processComment(columnName): void {
+            async function processComment(columnName): void {
                 let prop = columnNameToProp(columnName);
 
                 if (!prop) {
@@ -567,7 +567,7 @@ export namespace Knex {
                 }
             }
 
-            function commentOn(table, column, comment): void {
+            async function commentOn(table, column, comment): void {
                 if (knex.client.config.client === 'pg' && comment !== '') {
                     return knex.raw('COMMENT ON COLUMN "' + table + '"."' + column + '" IS \'' + comment.replace(/'/g, '\'\'') + '\';')
                         .then(function commentOnSuccessCallback(e) {
@@ -578,7 +578,7 @@ export namespace Knex {
             }
         }
 
-        function discoverColumns(table) {
+        async function discoverColumns(table) {
             return knex(table).columnInfo().then(function (info) {
                 for (const prop in props) {
                     const defineProperty = props[prop];
@@ -642,7 +642,7 @@ export namespace Knex {
         const schemaTable = 'index_schema_history';
         const schemaField = 'schema';
 
-        const loadSchema = function (tableName) {
+        const loadSchema = async function (tableName) {
             if (!!_dbschema) {
                 //@ts-ignore
                 return (_dbschema, tableName);

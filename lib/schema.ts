@@ -144,8 +144,7 @@ module.exports = function (PersistObjectTemplate) {
         }
     };
 
-    PersistObjectTemplate.isCrossDocRef = function (template, prop, defineProperty)
-    {
+    PersistObjectTemplate.isCrossDocRef = function (template, prop, defineProperty) {
         var schema = getSchema(template);
         var type = defineProperty.type;
         var of = defineProperty.of;

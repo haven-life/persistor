@@ -20,6 +20,7 @@ export class Persistent extends Supertype {
     static __collection__: any;
     static __schema__: any;
     static __table__: any;
+    static __parent__: typeof Persistent;
 
     // New names
 

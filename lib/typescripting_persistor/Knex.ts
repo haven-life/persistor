@@ -92,8 +92,7 @@ export namespace Knex {
         }
 
         return select
-            .then(processResults.bind(this))
-            .then(processError.bind(this));
+            .then(processResults.bind(this), processError.bind(this));
 
 
         function processResults(res) {

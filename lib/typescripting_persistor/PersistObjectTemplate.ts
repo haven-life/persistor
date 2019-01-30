@@ -2,6 +2,9 @@ import * as _ from 'underscore';
 
 import { ObjectTemplate } from 'supertype';
 
+import { MongoClient } from 'mongodb';
+import { db as DefaultDB } from './index';
+
 import * as knex from 'knex';
 import { PersistentConstructor } from './Persistent';
 import { Schema } from './Schema';
@@ -16,6 +19,8 @@ type Transaction = {
     deletedObjects: Object,
     deleteQueries?: Object
 }
+
+type KnexOrMongo = 'knex' | 'mongo';
 // @TODO: Need to export ObjectTemplate as well
 
 // This is kinda jank because it's not REALLY extending OT. This should really be a mixin.
@@ -31,7 +36,9 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static currentTransaction: Transaction;
     static dirtyObjects: any;
     static savedObjects: {};
-    static _db: any;
+
+    // instance of Knex
+    static _db: {[key: string]: {connection: knex | MongoClient, type: KnexOrMongo}};
     static __defaultTransaction__: Transaction;
     static _schema: any;
     static noAutoIndex: any;
@@ -350,7 +357,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
         type = type || PersistObjectTemplate.DB_Mongo;
         alias = alias || '__default__';
         this._db = this._db || {};
-        this._db[alias] = {connection: db, type: type}
+        this._db[alias] = {connection: db || DefaultDB, type: type}
     }
     
     /**
@@ -470,7 +477,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
      * @param {string} concurrency #parallel
      * @returns {*|Array}
      */
-    static async onAllTables (action, concurrency?): Promise<any[]> {
+    static async onAllTables (action: (template) => Promise<any>): Promise<any[]> {
         var templates = [];
         _.each(this.__dictionary__, (template) => {
             if (template.__schema__ && (!template.__schema__.documentOf || !template.__schema__.documentOf.match(/not persistent/i))) {
@@ -478,8 +485,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
             }
         });
 
-
-        return await Promise.map(templates, action, {concurrency: concurrency || 1});
+        return await Promise.all(templates.map(action));
     }
 
 }

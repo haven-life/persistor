@@ -1,52 +1,50 @@
 // third party modules
 import * as _ from 'underscore';
-
+import * as knexImport from 'knex';
 // internal modules
 import { UtilityFunctions } from './UtilityFunctions';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
-import * as Promise from 'bluebird';
 import {Persistent, PersistentConstructor} from "./Persistent";
 import {SupertypeConstructor} from "supertype/dist/Supertype";
 
+
 export namespace Knex {
 
-    // TODO NICK why do we need this to be here?
-    const processedList = [];
-
-    export function getPOJOsFromKnexQuery(persistor: typeof PersistObjectTemplate, template, joins, queryOrChains, options, map, customLogger, projection?) {
+        // TODO NICK why do we need this to be here?
+        const processedList = [];
+    export async function getPOJOsFromKnexQuery(persistor: typeof PersistObjectTemplate, template, joins, queryOrChains, options, map, customLogger, projection?) {
 
         const logger = customLogger || persistor.logger;
-
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection(tableName);
+        const queryBuilder = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         const columnNames = getColumnNames(persistor, template, joins, projection);
 
         // tack on outer joins.  All our joins are outerjoins and to the right.  There could in theory be
         // foreign keys pointing to rows that no longer exists
-        let select = knex.select(columnNames).from(tableName);
+        let select = queryBuilder.select(columnNames).from(tableName);
 
-        joins.forEach(function forAllJoins(join) {
-            select = select.leftOuterJoin(UtilityFunctions.dealias(join.template.__table__) + ' as ' + join.alias,
-                join.alias + '.' + join.parentKey,
-                UtilityFunctions.dealias(template.__table__) + '.' + join.childKey);
+        joins.forEach((join) => {
+            const joinTableName = UtilityFunctions.dealias(join.template.__table__);
+            const tableName = UtilityFunctions.dealias(template.__table__);
+            select = select.leftOuterJoin(`${joinTableName} as ${join.alias}`, `${join.alias}.${join.parentKey}`, `${tableName}.${join.childKey}`);
         });
 
         // execute callback to chain on filter functions or convert mongo style filters
-        // if (queryOrChains) {
-        //     if (typeof(queryOrChains) == 'function') {
-        //         queryOrChains(select);
-        //     }
-        //     else if (queryOrChains) {
-        //         select = this.convertMongoQueryToChains(tableName, select, queryOrChains);
-        //     }
-        // }
+        if (queryOrChains) {
+            if (typeof(queryOrChains) == 'function') {
+                queryOrChains(select);
+            }
+            else if (queryOrChains) {
+                select = convertMongoQueryToChains(tableName, select, queryOrChains);
+            }
+        }
 
         if (options && options.sort) {
-            const ascending = [];
+            const ascending: string[] = [];
             const descending = [];
 
-            _.each(options.sort, function sort(value, key) {
+            _.each(options.sort, (value, key) => {
                 if (value > 0) {
                     ascending.push(tableName + '.' + key);
                 }
@@ -55,11 +53,17 @@ export namespace Knex {
                 }
             });
 
+            // @TODO: ask srksag about conflicting types
             if (ascending.length) {
-                select = select.orderBy(ascending);
+                for(const asc of ascending) {
+                    select = select.orderBy(asc);
+                }
             }
             if (descending.length) {
-                select = select.orderBy(descending, 'DESC');
+                for(const desc of ascending) {
+                    select = select.orderBy(desc);
+                }
+                select = select.orderBy('DESC');
             }
         }
 
@@ -67,19 +71,30 @@ export namespace Knex {
             select = select.limit(options.limit);
             select = select.offset(0)
         }
+
         if (options && options.offset) {
             select = select.offset(options.offset);
         }
 
-        logger.debug({component: 'persistor', module: 'db.getPOJOsFromKnexQuery', activity: 'pre',
-            data: {template: template.__name__, query: queryOrChains}});
+        logger.debug(
+            {
+                component: 'persistor',
+                module: 'db.getPOJOsFromKnexQuery',
+                activity: 'pre',
+                data: {
+                    template: template.__name__,
+                    query: queryOrChains
+                }
+            });
 
         const selectString = select.toString();
 
         if (map && map[selectString]) {
-            return new Promise(function (resolve) {
-                map[selectString].push(resolve);
-            });
+            // @TODO: what's going on here
+            return map[selectString].push(await Promise.resolve());
+            // return new Promise(function (resolve) {
+            //     map[selectString].push(resolve);
+            // });
         }
 
         if (map) {
@@ -118,18 +133,19 @@ export namespace Knex {
      * @param {object} _logger objecttemplate logger
      * @returns {*}
      */
-    export function countFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, _logger) {
+    export async function countFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, _logger) {
         const tableName = UtilityFunctions.dealias(template.__table__);
         const knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
         // execute callback to chain on filter functions or convert mongo style filters
-        // if (typeof(queryOrChains) == 'function')
-        //     queryOrChains(knex);
-        // else if (queryOrChains)
-        //     (this.convertMongoQueryToChains)(tableName, knex, queryOrChains);
+        if (typeof(queryOrChains) === 'function') {
+            queryOrChains(knex);
+        }
+        else if (queryOrChains) {
+            convertMongoQueryToChains(tableName, knex, queryOrChains);
+        }
 
-        return knex.count('_id').then(function (ret) {
-            return ret[0].count * 1;
-        });
+        const countResult = await knex.count('_id');
+        return countResult[0].count * 1;
     }
 
     /**
@@ -139,7 +155,7 @@ export namespace Knex {
      * @param {string} tableName table to search on the database.
      * @returns {*}
      */
-    export function checkForKnexTable(persistor: typeof PersistObjectTemplate, template, tableName) {
+    export async function checkForKnexTable(persistor: typeof PersistObjectTemplate, template, tableName): Promise<boolean> {
         tableName = tableName ? tableName : UtilityFunctions.dealias(template.__table__);
         const knex = UtilityFunctions.getKnexConnection(persistor, template);
         return knex.schema.hasTable(tableName);
@@ -151,14 +167,13 @@ export namespace Knex {
      * @param {string} column column to search.
      * @returns {*}
      */
-    export function checkForKnexColumnType(persistor: typeof PersistObjectTemplate, template, column) {
+    export async function checkForKnexColumnType(persistor: typeof PersistObjectTemplate, template, column) {
         const tableName = UtilityFunctions.dealias(template.__table__);
         const knex = UtilityFunctions.getKnexConnection(persistor, template);
 
-        return knex(tableName).columnInfo(column)
-            .then(function(column) {
-                return column.type;
-            });
+        const columnMetaData = await knex(tableName).columnInfo(column);
+
+        return columnMetaData.type;
     }
 
     /**
@@ -167,22 +182,24 @@ export namespace Knex {
      * @param {string} indexName index name to drop
      * @constructor
      */
-    export function dropIfKnexIndexExists(persistor: typeof PersistObjectTemplate, template, indexName) {
+    export async function dropIfKnexIndexExists(persistor: typeof PersistObjectTemplate, template, indexName) {
         const tableName = UtilityFunctions.dealias(template.__table__);
         const knex = UtilityFunctions.getKnexConnection(persistor, template)
 
         if (indexName.indexOf('idx_') === -1) {
-            indexName = 'idx_' + tableName + '_' + indexName;
+            indexName = `idx_${tableName}_indexName`;
         }
-
-        return knex.schema.table(tableName, function (table) {
-            table.dropIndex([], indexName);
-        })
-            .catch(function (_error) {
-                return knex.schema.table(tableName, function (table) {
-                    table.dropUnique([], indexName);
+        
+        try {
+            return await knex.schema.table(tableName, (table) => {
+                table.dropIndex([], indexName);
             });
-        });
+        }
+        catch (err) {
+            return await knex.schema.table(tableName, (table) => {
+                table.dropUnique([], indexName);
+            })
+        }
     }
 
     /**
@@ -196,19 +213,20 @@ export namespace Knex {
      */
     export function deleteFromKnexQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, txn, _logger) {
         const tableName = UtilityFunctions.dealias(template.__table__);
-        const knex = UtilityFunctions.getKnexConnection(persistor, template);
+        const knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
+            // Compiler error @TODO:???
             knex.transacting(txn.knex);
         }
 
         // execute callback to chain on filter functions or convert mongo style filters
-        // if (typeof(queryOrChains) == 'function') {
-        //     queryOrChains(knex);
-        // }
-        // else if (queryOrChains) {
-        //     (this.convertMongoQueryToChains)(tableName, knex, queryOrChains);
-        // }
+        if (typeof(queryOrChains) == 'function') {
+            queryOrChains(knex);
+        }
+        else if (queryOrChains) {
+            convertMongoQueryToChains(tableName, knex, queryOrChains);
+        }
 
         return knex.delete();
     }
@@ -220,11 +238,11 @@ export namespace Knex {
         txn.deleteQueries = deleteQueries;
     }
 
-    export function knexPruneOrphans(persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger) {
+    export function knexPruneOrphans (persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger?) {
         const template = obj.__template__;
 
         const tableName = UtilityFunctions.dealias(template.__table__);
-        let knex = UtilityFunctions.getKnexConnection(persistor, template);
+        let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
             knex.transacting(txn.knex);
@@ -260,7 +278,8 @@ export namespace Knex {
      * @returns {*}
      */
     export function deleteFromKnexId(persistor: typeof PersistObjectTemplate, template, id, txn, _logger) {
-        let knex = UtilityFunctions.getKnexConnection(persistor, template);
+        const tableName = this.dealias(template.__table__);
+        let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
             knex.transacting(txn.knex);
@@ -278,7 +297,7 @@ export namespace Knex {
      * @param {object} logger objecttemplate logger
      * @returns {*}
      */
-    export function saveKnexPojo(persistor: typeof PersistObjectTemplate, obj, pojo, updateID, txn, logger) {
+    export async function saveKnexPojo(persistor: typeof PersistObjectTemplate, obj, pojo, updateID, txn, logger) {
         const origVer = obj.__version__;
 
         const tableName = UtilityFunctions.dealias(obj.__template__.__table__);
@@ -293,13 +312,13 @@ export namespace Knex {
             knex.transacting(txn.knex)
         }
         if (updateID) {
-            return knex
+            return await knex
                 .where('__version__', '=', origVer).andWhere('_id', '=', updateID)
                 .update(pojo)
                 .then(checkUpdateResults)
                 .then(logSuccess);
         } else {
-            return knex
+            return await knex
                 .insert(pojo)
                 .then(logSuccess);
         }
@@ -333,7 +352,7 @@ export namespace Knex {
      * @param {bool} forceSync forces the function to proceed with sync table step, useful for unit tests.
      * @returns {*}
      */
-    export function synchronizeKnexTableFromTemplate(persistor: typeof PersistObjectTemplate, template: typeof Persistent, changeNotificationCallback, forceSync: boolean) {
+    export async function synchronizeKnexTableFromTemplate(persistor: typeof PersistObjectTemplate, template: typeof Persistent, changeNotificationCallback, forceSync: boolean) {
         const aliasedTableName = template.__table__;
         const tableName = UtilityFunctions.dealias(aliasedTableName);
 
@@ -370,12 +389,12 @@ export namespace Knex {
         const schema = template.__schema__;
         const _newFields = {};
 
-        return buildTable()
+        return await buildTable()
             .then(addComments(tableName))
             .then(synchronizeIndexes(persistor, tableName, template));
 
-        function buildTable() {
-            return knex.schema.hasTable(tableName)
+        async function buildTable() {
+            return await knex.schema.hasTable(tableName)
                 .then((exists) => {
                     // handle error conditions
                     if (!exists) {
@@ -443,11 +462,11 @@ export namespace Knex {
             }
         }
 
-        function addComments(table) {
-            return knex(table).columnInfo().then(function (info) {
+        async function addComments(table: string) {
+            return knex(table).columnInfo().then(async function (info) {
                 const promises = [];
                 for (const columnName in info) {
-                    const knexCommentPromise = processComment(columnName);
+                    const knexCommentPromise = await processComment(columnName);
                     if (!!knexCommentPromise) {
                         promises.push(knexCommentPromise);
                     }
@@ -455,7 +474,7 @@ export namespace Knex {
                 return Promise.all(promises);
             });
 
-            function processComment(columnName): void {
+            async function processComment(columnName): Promise<void> {
                 let prop = columnNameToProp(columnName);
 
                 if (!prop) {
@@ -568,7 +587,7 @@ export namespace Knex {
                 }
             }
 
-            function commentOn(table, column, comment): void {
+            async function commentOn(table, column, comment): Promise<void> {
                 if (knex.client.config.client === 'pg' && comment !== '') {
                     return knex.raw('COMMENT ON COLUMN "' + table + '"."' + column + '" IS \'' + comment.replace(/'/g, '\'\'') + '\';')
                         .then(function commentOnSuccessCallback(e) {
@@ -579,7 +598,7 @@ export namespace Knex {
             }
         }
 
-        function discoverColumns(table) {
+        async function discoverColumns(table) {
             return knex(table).columnInfo().then(function (info) {
                 for (const prop in props) {
                     const defineProperty = props[prop];
@@ -642,7 +661,7 @@ export namespace Knex {
         const schemaTable = 'index_schema_history';
         const schemaField = 'schema';
 
-        const loadSchema = function (tableName) {
+        const loadSchema = async function (tableName) {
             if (!!_dbschema) {
                 //@ts-ignore
                 return (_dbschema, tableName);
@@ -877,7 +896,7 @@ export namespace Knex {
     export function createKnexTable(persistor: typeof PersistObjectTemplate, template, collection) {
         collection = collection || template.__table__;
         const tableName = UtilityFunctions.dealias(collection);
-        return _createKnexTable(template, collection)
+        return _createKnexTable(persistor, template, collection)
             .then(synchronizeIndexes(persistor, tableName, template))
     }
 
@@ -1250,7 +1269,7 @@ function _createKnexTable(persistor: typeof PersistObjectTemplate, template, col
 
     while (template.__parent__) {
         template =  template.__parent__;
-    t}
+    }
 
     const knex = UtilityFunctions.getKnexConnection(persistor, template);
     const tableName = UtilityFunctions.dealias(collection);
@@ -1306,4 +1325,149 @@ function _createKnexTable(persistor: typeof PersistObjectTemplate, template, col
             }
         }
     }
-};
+}
+
+export function convertMongoQueryToChains(alias, statement, query) {
+
+    /**
+     * Traverse an object and produce a promise chain of where and andWhere
+     * @param {object} statement knex query
+     * @param {object} query mongo style query object
+     * @returns {*}
+     */
+    function traverse(statement, query) {
+        var firstProp = true;
+        for (var prop in query) {
+            var params = processProp(statement, prop, query[prop]);
+            statement = firstProp ?
+                (params.length > 1 ? statement.where(params[0], params[1], params[2]) :
+                    statement.where(params[0])) :
+                (params.length > 1 ? statement.andWhere(params[0], params[1], params[2]) :
+                    statement.andWhere(params[0]));
+            firstProp = false;
+        }
+        return statement;
+    }
+
+    function processProp(_statement, prop, value) {
+        if (value instanceof Array)
+            return processArrayProp(prop, value);
+        else
+            return processNonArrayProp(prop, value)
+    }
+
+    function processArrayProp(prop, value) {
+        return [function () {
+            var firstProp;
+            var statement = this;
+            if (prop.toLowerCase() == '$and') {
+                firstProp = true;
+                _.each(value, function (obj) {
+                    var params = processObject(statement, obj);
+                    statement = firstProp ?
+                        (params.length > 1 ? statement.where(params[0], params[1], params[2]) :
+                            statement.where(params[0])) :
+                        (params.length > 1 ? statement.andWhere(params[0], params[1], params[2]) :
+                            statement.andWhere(params[0]));
+                    firstProp = false;
+                });
+            } else if (prop.toLowerCase() == '$or') {
+                firstProp = true;
+                _.each(value, function (obj) {
+                    var params = processObject(statement, obj);
+                    statement = firstProp ?
+                        (params.length > 1 ? statement.where(params[0], params[1], params[2]) :
+                            statement.where(params[0])) :
+                        (params.length > 1 ? statement.orWhere(params[0], params[1], params[2]) :
+                            statement.andWhere(params[0]));
+                    firstProp = false
+                });
+            } else if (prop.toLowerCase() == '$in')
+                statement = statement.whereIn(value);
+            else if (prop.toLowerCase() == '$nin')
+                statement = statement.whereNotIn(value);
+            else
+                throw 'Don\'t support ' + prop + ':' + JSON.stringify(value)
+        }];
+    }
+
+    /**
+     * Process an array element of a $or or $and.  This will result in either three parameters in
+     * the form of prop, compare operator, value or a single parameter which is a function that
+     * will chain together a nested expression.
+     * @param {object} statement knex query object
+     * @param {object} obj object of supertype
+     * @returns {Function}
+     */
+    function processObject(statement, obj) {
+        var propCount = 0;
+        var singleProp;
+
+        // Do we have more than one prop
+        for (var prop in obj) {
+            singleProp = prop;
+            ++propCount;
+        }
+
+        // If so fetch the 3 parameters for a where, orWhere or andWhere chain
+        // Otherwise return a function that will chain sub-ordinate clauses
+        if (propCount == 1)
+            return processProp(statement, singleProp, obj[singleProp]);
+        else
+            return [function () {
+                traverse(statement, obj)
+            }]
+    }
+
+    function processNonArrayProp(prop, value) {
+        var params = [];
+        if (value instanceof Date || typeof(value) == 'string' || typeof(value) == 'number') {
+            params[0] = alias + '.' + prop;
+            params[1] = '=';
+            params[2] = value;
+        } else
+            for (var subProp in value) {
+                params[0] = alias + '.' + prop;
+                params[2] = value[subProp];
+                if (subProp.toLowerCase() == '$eq')
+                    params[1] = '=';
+                else if (subProp.toLowerCase() == '$gt')
+                    params[1] = '>';
+                else if (subProp.toLowerCase() == '$gte')
+                    params[1] = '>=';
+                else if (subProp.toLowerCase() == '$lt')
+                    params[1] = '<';
+                else if (subProp.toLowerCase() == '$lte')
+                    params[1] = '<=';
+                else if (subProp.toLowerCase() == '$ne')
+                    params[1] = '!=';
+                else if (subProp.toLowerCase() == '$in') {
+                    (function () {
+                        var attr = params[0];
+                        var values = params[2];
+                        params = [function () {
+                            this.whereIn(attr, values)
+                        }];
+                    })()
+                }
+                else if (subProp.toLowerCase() == '$nin')
+                    (function () {
+                        var attr = params[0];
+                        var values = params[2];
+                        params = [function () {
+                            this.whereNotIn(attr, values)
+                        }];
+                    })()
+                else if (subProp.toLowerCase() == '$regex') {
+                    params[1] = value.$options && value.$options.match(/i/) ? '~*' : '~';
+                    delete value['$options']
+                    if (params[2] && params[2].source)
+                        params[2] = params[2].source;
+                } else
+                    throw 'Can\'t handle ' + prop + ':' + JSON.stringify((value));
+            }
+        return params;
+    }
+
+    return traverse(statement, query)
+}

@@ -511,7 +511,7 @@ export class Persistent extends Supertype {
      * @param {object} txn persistObjectTemplate transaciton object
      * @param {object} logger objecttemplate logger
      * @returns {object}
-     * @deprecated in favor of persistorDeleteById
+     * @deprecated in favor of persistorDeleteById - THIS DOESN"T EXIST. We need to UNDEPRECATE
      */
     static async deleteFromPersistWithId(id, txn?, logger?) {
 

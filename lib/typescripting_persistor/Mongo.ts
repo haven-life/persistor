@@ -250,7 +250,7 @@ export namespace Mongo {
             var isCrossDocRef = Schema.isCrossDocRef(persistor, template, prop, defineProperty);
             var value = obj[prop];
 
-            if (!UtilityFunctions._persistProperty(persistor, defineProperty) || !defineProperty.enumerable || typeof (value) == 'undefined' || value == null) {
+            if (!UtilityFunctions._persistProperty(defineProperty) || !defineProperty.enumerable || typeof (value) == 'undefined' || value == null) {
 
                 // Make sure we don't wipe out foreign keys of non-cascaded object references
                 if (defineProperty.type != Array && defineProperty.type && defineProperty.type.isObjectTemplate &&
@@ -260,7 +260,7 @@ export namespace Mongo {
                     pojo[schema.parents[prop].id] = new ObjectID(obj[prop + 'Persistor'].id.toString());
                     continue;
                 }
-                if (!UtilityFunctions._persistProperty(persistor, defineProperty) || !defineProperty.enumerable || typeof (value) == 'undefined')
+                if (!UtilityFunctions._persistProperty(defineProperty) || !defineProperty.enumerable || typeof (value) == 'undefined')
                     continue;
             }
 
@@ -513,7 +513,7 @@ export namespace Mongo {
 
         let closureDefineProperty = defineProperty;
         var closureOf = closureDefineProperty.of;
-        var closureCascade = processCascade(query, options, cascadeFetch, (schema && schema.children) ? schema.children[closureProp].fetch : null, defineProperty.fetch);
+        var closureCascade = UtilityFunctions.processCascade(query, options, cascadeFetch, (schema && schema.children) ? schema.children[closureProp].fetch : null, defineProperty.fetch);
         var closureIsSubDoc = !!closureDefineProperty.of.__schema__.subDocumentOf;
         obj[closureProp] = [];
 
@@ -600,7 +600,7 @@ export namespace Mongo {
 
         // Create the new object with correct constructor using embedded ID if ObjectTemplate
         const templateId = `persist${template.__name__}-${pojo._template.replace(/.*:/, '')}-${pojo._id.toString()}`;
-        var obj = establishedObj || idMap[pojo._id.toString()] || persistor._createEmptyObject(template, templateId, defineProperty);
+        var obj = establishedObj || idMap[pojo._id.toString()] || persistor._createEmptyObject(template, templateId, defineProperty, isTransient);
 
         // Once we find an object already fetch that is not transient query as normal for the rest
         if (!obj.__transient__ && !establishedObj && !isTransient)
@@ -643,7 +643,7 @@ export namespace Mongo {
 
             // Make sure this is property is persistent and that it has a value.  We have to skip
             // undefined values in case a new property is added so it can retain it's default value
-            if (!UtilityFunctions._persistProperty(persistor, defineProperty) || !defineProperty.enumerable ||
+            if (!UtilityFunctions._persistProperty(defineProperty) || !defineProperty.enumerable ||
                 (!isCrossDocRef && (typeof (value) == 'undefined')))
                 continue;
             if (!type)
@@ -679,7 +679,7 @@ export namespace Mongo {
                                     obj[prop][ix] = idMap[pojo[prop][ix]];
                             } else {
                                 options = defineProperty.queryOptions || {};
-                                cascadeFetchProp = processCascade(query, options, cascadeFetch, null, defineProperty.fetch);
+                                cascadeFetchProp = UtilityFunctions.processCascade(query, options, cascadeFetch, null, defineProperty.fetch);
                                 obj[prop][ix] = idMap[pojo[prop][ix]._id.toString()] ||
                                     getTemplateFromPOJO(persistor, pojo[prop][ix], defineProperty.of, promises, defineProperty, idMap,
                                         cascadeFetchProp, null, null, isTransient, logger);
@@ -750,7 +750,7 @@ export namespace Mongo {
                                 obj[prop] = idMap[pojo[prop]];
                         } else {
                             options = defineProperty.queryOptions || {};
-                            cascadeFetchProp = processCascade(query, options, cascadeFetch, null, defineProperty.fetch);
+                            cascadeFetchProp = UtilityFunctions.processCascade(query, options, cascadeFetch, null, defineProperty.fetch);
 
                             obj[prop] = idMap[pojo[prop]._id.toString()] || await getTemplateFromPOJO(persistor, pojo[prop], type, promises,
                                 defineProperty, idMap, cascadeFetchProp, null, null, isTransient, logger);
@@ -791,7 +791,7 @@ export namespace Mongo {
                                     const closureType = type;
                                     const closurePersistorProp = persistorPropertyName;
 
-                                    const closureCascade = processCascade(query, options, cascadeFetch, (schema && schema.parents) ? schema.parents[prop].fetch : null, defineProperty.fetch);
+                                    const closureCascade = UtilityFunctions.processCascade(query, options, cascadeFetch, (schema && schema.parents) ? schema.parents[prop].fetch : null, defineProperty.fetch);
                                     const closureDefineProperty = defineProperty;
                                     const closureForeignId = foreignId;
                                     const closureIsSubDoc = !!closureDefineProperty.type.__schema__.subDocumentOf;
@@ -1054,63 +1054,6 @@ export namespace Mongo {
             }
         }
         return results;
-    }
-
-
-    /**
-    * Extract query and options out of cascade spec and return new subordinate cascade spec
-    *
-    * @param {object} query to fill in
-    * @param {object} options to fill in
-    * @param {object} parameterFetch options specified in call
-    * @param {object} schemaFetch options specified in schema
-    * @param {object} propertyFetch options specified in template
-    * @returns {{}}
-    */
-
-    // processCascade
-    export function processCascade(query, options, parameterFetch, schemaFetch, propertyFetch) {
-
-        var fetch: any = {}; // Merge fetch specifications in order of priority
-        var prop;
-
-        if (propertyFetch) {
-            for (prop in propertyFetch) {
-                fetch[prop] = propertyFetch[prop];
-            }
-        }
-
-        if (schemaFetch) {
-            for (prop in schemaFetch) {
-                fetch[prop] = schemaFetch[prop];
-            }
-        }
-
-        if (parameterFetch) {
-            for (prop in parameterFetch) {
-                fetch[prop] = parameterFetch[prop];
-            }
-        }
-
-        var newCascade = {}; // Split out options, query and cascading fetch
-
-        for (var option in fetch)
-            switch (option) {
-                case 'fetch':
-                    newCascade = fetch.fetch;
-                    break;
-
-                case 'query':
-                    for (prop in fetch.query) {
-                        query[prop] = fetch.query[prop];
-                    }
-                    break;
-
-                default:
-                    options[option] = fetch[option];
-
-            }
-        return newCascade;
     }
 
     /**

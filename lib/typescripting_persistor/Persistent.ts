@@ -6,6 +6,8 @@ import { UtilityFunctions } from './UtilityFunctions';
 import { ObjectID } from 'mongodb';
 import { SchemaValidator } from './SchemaValidator';
 import { Mongo } from './Mongo';
+import { DefinePropertyType } from 'supertype/dist/Supertype';
+import { Knex } from './Knex';
 
 
 export type Constructor<T> = new(...args) => T;
@@ -223,9 +225,7 @@ export class Persistent extends Supertype {
     */
     static persistorGetKnex() {
         const tableName = UtilityFunctions.dealias(this.__table__);
-        const dbType = UtilityFunctions.getDBType(PersistObjectTemplate, this.__table__);
-
-        return dbType.connection(tableName);
+        return UtilityFunctions.getKnexConnection(PersistObjectTemplate, this)(tableName);
     }
 
     /**
@@ -478,7 +478,7 @@ export class Persistent extends Supertype {
                 return await Mongo.findByQuery(PersistObjectTemplate, this, query, cascade, start, limit, isTransient, idMap, options, logger);
             }
             else {
-                return await PersistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, cascade, start, limit, isTransient, idMap, options, undefined, undefined, logger);
+                return await Knex.Database.getFromPersistWithKnexQuery(null, this, query, cascade, start, limit, isTransient, idMap, options, undefined, undefined, logger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, 'getFromPersistWithQuery');
@@ -691,7 +691,7 @@ export class Persistent extends Supertype {
             return await returnVal._id.toString(); //@TODO: do we need to await here? we already awaited returnval
         }
         else {
-            const returnVal = await persistObjectTemplate.persistSaveKnex(this, txn, logger);
+            const returnVal = await Knex.Query.persistSaveKnex(this, txn, logger);
             if (txn) {
                 UtilityFunctions.saved(PersistObjectTemplate, returnVal, txn);
             }
@@ -850,6 +850,10 @@ export class Persistent extends Supertype {
     // Deprecated API (DO NOT USE THESE)
     static isKnex() {
         return this.persistorIsKnex();
+    }
+
+    static createProperty(prop: string, defineProperty: DefinePropertyType & {persist?: boolean}): void {
+        super.createProperty(prop, defineProperty);
     }
 
     static getKnex() {

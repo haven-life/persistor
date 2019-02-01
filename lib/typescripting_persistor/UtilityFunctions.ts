@@ -21,6 +21,11 @@ export namespace UtilityFunctions {
         }
     }
 
+    export function getDBByCollection(persistor: typeof PersistObjectTemplate, collection) {
+        const dbAlias = UtilityFunctions.getDBAlias(collection);
+        return UtilityFunctions.getDB(persistor, dbAlias);
+    }
+
     export function getDBType(persistor: typeof PersistObjectTemplate, collection) {
         const dbAlias = UtilityFunctions.getDBAlias(collection);
         return UtilityFunctions.getDB(persistor, dbAlias).type;
@@ -302,8 +307,12 @@ export namespace UtilityFunctions {
 
     export async function resolveRecursivePromises (promises, returnValue) {
 
+        const remainingPromises = promises.length;
+ 
         await Promise.all(promises);
-
+ 
+        promises.splice(0, remainingPromises);
+ 
         if (promises.length > 0 ) {
             return resolveRecursivePromises(promises, returnValue);
         }

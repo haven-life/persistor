@@ -64,7 +64,6 @@ module.exports = function (_ObjectTemplate, _RemoteObjectTemplate, baseClassForP
     PersistObjectTemplate.savedObjects = {};
 
     require('./api.js')(PersistObjectTemplate, baseClassForPersist);
-    require('./schema.js')(PersistObjectTemplate);
     require('./util.js')(PersistObjectTemplate);
     require('./mongo/query.js')(PersistObjectTemplate);
     require('./mongo/update.js')(PersistObjectTemplate);

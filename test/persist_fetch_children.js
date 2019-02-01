@@ -15,6 +15,9 @@ var schema = {};
 var schemaTable = 'index_schema_history';
 var Employee, Department, Role, roleId;
 var PersistObjectTemplate, ObjectTemplate;
+
+var persistorSchema = require('../dist/lib/schema');
+
 describe('persistor transaction checks', function () {
     before('drop schema table once per test suit', function() {
         knex = knexInit({
@@ -111,7 +114,7 @@ describe('persistor transaction checks', function () {
 
         (function () {
             PersistObjectTemplate.setDB(knex, PersistObjectTemplate.DB_Knex);
-            PersistObjectTemplate.setSchema(schema);
+            persistorSchema.Schema.setSchema(PersistObjectTemplate, schema);
             PersistObjectTemplate.performInjections();
 
         })();

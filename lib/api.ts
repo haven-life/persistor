@@ -14,6 +14,8 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
 
     var Promise = require('bluebird');
     var _ = require('underscore');
+    var mongo = require('./Mongo');
+    var schema = require('./schema');
 
 
     /**
@@ -51,7 +53,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
     }
     PersistObjectTemplate._prepareSchema = function (template) {
         if (!this.schemaVerified) {
-            this._verifySchema();
+            schema.Schema._verifySchema(this);
         }
         this.schemaVerified = true;
 
@@ -437,7 +439,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 var refType = of || type;
 
                 if (refType && refType.isObjectTemplate && PersistObjectTemplate._persistProperty(defineProperty)) {
-                    var isCrossDocRef = PersistObjectTemplate.isCrossDocRef(template, prop, defineProperty)
+                    var isCrossDocRef = schema.Schema.isCrossDocRef(template, prop, defineProperty)
                     if (isCrossDocRef || defineProperty.autoFetch) {
                         (function () {
                             var closureProp = prop;
@@ -477,7 +479,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 data: {template: this.__template__.__name__, id: this.__id__}});
             var dbType = persistObjectTemplate.getDB(persistObjectTemplate.getDBAlias(this.__template__.__collection__)).type;
             return dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.persistSaveMongo(this, undefined, undefined, undefined, txn, logger)
+                mongo.Mongo.persistSave(PersistObjectTemplate, this, undefined, undefined, undefined, txn, logger)
                     .then (function (obj) {
                         if (txn) {
                             persistObjectTemplate.saved(obj, txn);
@@ -500,7 +502,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 data: {template: this.__template__.__name__, id: this.__id__}});
             var dbType = persistObjectTemplate.getDB(persistObjectTemplate.getDBAlias(this.__template__.__collection__)).type;
             return dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.persistSaveMongo(this, undefined, undefined, undefined, txn, logger)
+                mongo.Mongo.persistSave(PersistObjectTemplate, this, undefined, undefined, undefined, txn, logger)
                 : persistObjectTemplate.persistTouchKnex(this, txn, logger);
         };
 

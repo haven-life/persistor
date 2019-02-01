@@ -10,6 +10,7 @@ var PersistObjectTemplate = require('../dist/index.js')(ObjectTemplate, null, Ob
 var writing = true;
 
 var mongo = require('../dist/lib/Mongo.js');
+var persistorSchema = require('../dist/lib/schema');
 /*
 PersistObjectTemplate.debug = function(m, t) {
     if (t.match(/(query)|(io)/))
@@ -251,7 +252,7 @@ describe('Banking Example', function () {
         return MongoClient.connect(`mongodb://${process.env.mongoHost}:27017/testpersist`).then(function (dbopen) {
             db = dbopen;
             PersistObjectTemplate.setDB(db);
-            PersistObjectTemplate.setSchema(schema);
+            persistorSchema.Schema.setSchema(PersistObjectTemplate, schema);
             PersistObjectTemplate.performInjections(); // Normally done by getTemplates
         }).catch(function(e) {throw e;});
     });
@@ -326,11 +327,11 @@ describe('Banking Example', function () {
         var custForSavePojo = new Customer();
 
         db._collections.customer.createIndex({'firstName': 1}, {unique: true});
-        return PersistObjectTemplate.savePojoToMongo(custForSavePojo, {
+        return mongo.Mongo.savePojoToMongo(PersistObjectTemplate, custForSavePojo, {
             'firstName': 'custForSavePojo',
             'lastName': 'lastName'
         }).then(function () {
-            return PersistObjectTemplate.savePojoToMongo(custForSavePojo, {
+            return mongo.Mongo.savePojoToMongo(PersistObjectTemplate, custForSavePojo, {
                 'firstName': 'custForSavePojo',
                 'lastName': 'lastName'
             });
@@ -722,27 +723,27 @@ describe('Banking Example', function () {
     });
 
     it('getDB without setting database', function () {
-        expect(PersistObjectTemplate.persistSaveMongo.bind(this, {})).to.throw('Attempt to save an non-templated Object');
+        expect(mongo.Mongo.persistSaveMongo(PersistObjectTemplate, {})).to.throw('Attempt to save an non-templated Object');
         var testWithOutSchema = PersistObjectTemplate.create('testWithOutSchema', {});
         var obj = new testWithOutSchema();
-        expect(PersistObjectTemplate.persistSaveMongo.bind(this, obj)).to.throw('Schema entry missing for testWithOutSchema');
+        expect(mongo.Mongo.persistSaveMongo(PersistObjectTemplate, obj)).to.throw('Schema entry missing for testWithOutSchema');
         var schema = {};
         schema.testWithOutSchema = {};
         PersistObjectTemplate.setSchema(schema);
         PersistObjectTemplate._verifySchema();
-        expect(PersistObjectTemplate.persistSaveMongo.bind(PersistObjectTemplate, obj)).to.throw('which subDocument without necessary parent links to reach top level document');
+        expect(mongo.Mongo.persistSaveMongo(PersistObjectTemplate, obj)).to.throw('which subDocument without necessary parent links to reach top level document');
     });
 
     it('Loading template from ', function () {
-        expect(PersistObjectTemplate.persistSaveMongo.bind(this, {})).to.throw('Attempt to save an non-templated Object');
+        expect(mongo.Mongo.persistSaveMongo(PersistObjectTemplate, {})).to.throw('Attempt to save an non-templated Object');
         var testWithOutSchema1 = PersistObjectTemplate.create('testWithOutSchema1', {});
         var obj = new testWithOutSchema1();
-        expect(PersistObjectTemplate.persistSaveMongo.bind(PersistObjectTemplate, obj)).to.throw('Schema entry missing for testWithOutSchema');
+        expect(mongo.Mongo.persistSaveMongo(PersistObjectTemplate, obj)).to.throw('Schema entry missing for testWithOutSchema');
         var schema = {};
         schema.testWithOutSchema1 = {};
         PersistObjectTemplate.setSchema(schema);
         PersistObjectTemplate._verifySchema();
-        expect(PersistObjectTemplate.persistSaveMongo.bind(PersistObjectTemplate, obj)).to.throw('which subDocument without necessary parent links to reach top level document');
+        expect(mongo.Mongo.persistSaveMongo(PersistObjectTemplate, obj)).to.throw('which subDocument without necessary parent links to reach top level document');
     });
 
 

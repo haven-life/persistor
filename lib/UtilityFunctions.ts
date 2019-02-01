@@ -1,5 +1,5 @@
 import * as _ from 'underscore';
-import { ObjectID } from 'mongodb';
+import { mongodb } from 'mongodb-bluebird';
 
 export namespace UtilityFunctions {
 
@@ -203,7 +203,7 @@ export namespace UtilityFunctions {
     }
 
     export function createPrimaryKey(persistor, obj) {
-        const objectId = new ObjectID();
+        const objectId = new mongodb.ObjectID();
         const key = objectId.toString();
 
         if (persistor.objectMap && !obj.__transient__) {
@@ -263,16 +263,20 @@ export namespace UtilityFunctions {
 
     export function getDBID (masterId?) {
         if (!masterId) {
-            return new ObjectID();
+            return new mongodb.ObjectID();
         }
         else {
-            return `${masterId.toString()}:${new ObjectID().toString()}`;
+            return `${masterId.toString()}:${new mongodb.ObjectID().toString()}`;
         }
     }
 
     export async function resolveRecursivePromises (promises, returnValue) {
 
+        const remainingPromises = promises.length;
+
         await Promise.all(promises);
+
+        promises.splice(0, remainingPromises);
 
         if (promises.length > 0 ) {
             return resolveRecursivePromises(promises, returnValue);

@@ -271,7 +271,7 @@ module.exports = function (PersistObjectTemplate) {
             });
         else
             return pojo;
-    }
+    };
 
     /**
      * Remove objects from a collection/table

@@ -8,6 +8,8 @@ var expect = require('chai').expect;
 var ObjectTemplate = require('supertype').default;
 var PersistObjectTemplate = require('../dist/index.js')(ObjectTemplate, null, ObjectTemplate);
 var writing = true;
+
+var mongo = require('../dist/lib/Mongo.js');
 /*
 PersistObjectTemplate.debug = function(m, t) {
     if (t.match(/(query)|(io)/))
@@ -315,7 +317,7 @@ describe('Banking Example', function () {
 
     it('calling savePojoToMongo directly', function() {
         var custForSavePojo = new Customer();
-        PersistObjectTemplate.savePojoToMongo(custForSavePojo, {
+        mongo.Mongo.savePojoToMongo(PersistObjectTemplate, custForSavePojo, {
             'firstName': 'custForSavePojo',
             'lastName': 'lastName'}, 1)
     });

@@ -1,32 +1,8 @@
+// import { Mongo } from '../Mongo';
+
 module.exports = function (PersistObjectTemplate) {
 
-    /* Mongo implementation of save */
-    PersistObjectTemplate.savePojoToMongo = function(obj, pojo, updateID, _txn, logger) {
-        (logger || this.logger).debug({component: 'persistor', module: 'db', activity: 'write'}, 'saving ' + obj.__template__.__name__ + ' to ' + obj.__template__.__collection__);
-        var origVer = obj.__version__;
-        obj.__version__ = obj.__version__ ? obj.__version__ + 1 : 1;
-        pojo.__version__ = obj.__version__;
-        var db = this.getDB(this.getDBAlias(obj.__template__.__collection__)).connection;
-        var collection = db.collection(this.dealias(obj.__template__.__collection__));
-        return (updateID ?
-            collection.update(origVer  ? {__version__: origVer, _id: updateID} :  {_id: updateID}, pojo, {w:1}) :
-            collection.save(pojo, {w:1})
-        );
-        // ).then (function (error, count) {
-        //     if (error instanceof Array)
-        //         count = error[0]; // Don't know why things are returned this way
-        //     if (updateID && count == 0) {
-        //         obj.__version__ = origVer;
-        //         if (txn && txn.onUpdateConflict) {
-        //             txn.onUpdateCoxnflict(pojo)
-        //             txn.updateConflict =  new Error("Update Conflict");
-        //         } else
-        //             throw new Error("Update Conflict");
-        //     }
-        //     (logger || this.logger).debug({component: 'persistor', module: 'db', activity: 'write'}, 'saved ' + obj.__template__.__name__ + " to " + obj.__template__.__collection__);
-        //     return true;
-        // }.bind(this));
-    }
+    // PersistObjectTemplate.savePojoToMongo = Mongo.savePojoToMongo;
 
     /**
      * Removes documents based on a query

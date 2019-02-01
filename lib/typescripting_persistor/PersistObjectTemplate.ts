@@ -2,7 +2,7 @@ import * as _ from 'underscore';
 
 import { ObjectTemplate } from 'supertype';
 
-import { MongoClient } from 'mongodb';
+import * as MongoClient from 'mongodb-bluebird';
 import { db as DefaultDB } from './index';
 
 import * as knex from 'knex';
@@ -52,6 +52,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static __transient__: boolean;
     static objectMap: boolean;
     static __changeTracking__: boolean;
+    static deleteQueries: any;
 
     // @TODO: remove for uuid
     // static objId = ObjectID;
@@ -330,7 +331,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
             let obj = dirtyObjects[key];
             delete dirtyObjects[obj.__id__];
             await obj.persistSave(txn, logger);
-            this.saved(obj, txn);
+            UtilityFunctions.saved(this, obj, txn);
             somethingSaved = true;
         });
 
@@ -375,14 +376,14 @@ export class PersistObjectTemplate extends ObjectTemplate {
      * */
     static async getPOJOFromQuery  (template, query, options?, logger?) {
         
-        const prefix = this.dealias(template.__collection__);
+        const prefix = UtilityFunctions.dealias(template.__collection__);
         
         let pojos;
         if (UtilityFunctions.isDBMongo(this, template.__collection__)) {
             return await Mongo.getPOJOByQuery(this, template, query, options, logger);
         }
         else {
-            pojos = await this.getPOJOsFromKnexQuery(template, [], query, options, undefined, logger);
+            pojos = await Knex.Database.getPOJOsFromKnexQuery(this, template, [], query, options, undefined, logger);
         }
         // @TODO make sure this is supposed to happen for both mongo and knex ask srksag
         pojos.forEach((pojo) => {
@@ -430,7 +431,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
         const persistorTransaction: Transaction = options.transaction || this.__defaultTransaction__;
 
         if (PersistObjectTemplate.DB_Knex) {
-            return await Knex.Query._commitKnex(this, persistorTransaction, logger, options.notifyChanges);
+            return await Knex.Database._commitKnex(this, persistorTransaction, logger, options.notifyChanges);
         }
     }
 
@@ -462,7 +463,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
      */
     
      static async dropAllTables() {
-        let results = await this.onAllTables(async (template) => await this.synchronizeKnexTableFromTemplate(template));
+        let results = await this.onAllTables(async (template) => await Knex.Database.dropKnexTable(this, template));
         return await Promise.all(results);
     }
 
@@ -471,7 +472,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
     * @returns {*|Array}
     */
     static async syncAllTables() {
-        let results = await this.onAllTables(async (template) => await this.synchronizeKnexTableFromTemplate(template));
+        let results = await this.onAllTables(async (template) => await Knex.Database..synchronizeKnexTableFromTemplate(this, template));
         return await Promise.all(results);
     }
     /**

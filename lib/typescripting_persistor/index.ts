@@ -6,7 +6,8 @@ export let db: knex | MongoClient;
 
 import {PersistObjectTemplate} from './PersistObjectTemplate';
 import { ObjectTemplate } from 'supertype'
-import { MongoClient, MongoClientOptions } from 'mongodb';
+import { MongoClientOptions } from 'mongodb';
+import * as MongoClient from 'mongodb-bluebird';
 import * as knex from 'knex';
 
 enum DriverType {

@@ -8,7 +8,7 @@ import { Persistent, PersistentConstructor } from "./Persistent";
 import { SupertypeConstructor } from 'supertype';
 
 export namespace Knex {
-    export namespace Query {
+    export namespace Database {
 
         // TODO NICK why do we need this to be here?
         const processedList = [];
@@ -287,7 +287,7 @@ export namespace Knex {
             const origVer = obj.__version__;
 
             const tableName = UtilityFunctions.dealias(obj.__template__.__table__);
-            const knex = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(obj.__template__.__table__)).connection(tableName);
+            const knex = UtilityFunctions.getKnexConnection(persistor, obj.__template__)(tableName);
 
             obj.__version__ = obj.__version__ ? obj.__version__ * 1 + 1 : 1;
             pojo.__version__ = obj.__version__;
@@ -346,7 +346,7 @@ export namespace Knex {
          * @param {bool} forceSync forces the function to proceed with sync table step, useful for unit tests.
          * @returns {*}
          */
-        export async function synchronizeKnexTableFromTemplate(persistor: typeof PersistObjectTemplate, template: typeof Persistent, changeNotificationCallback, forceSync: boolean) {
+        export async function synchronizeKnexTableFromTemplate(persistor: typeof PersistObjectTemplate, template: typeof Persistent, changeNotificationCallback?, forceSync?: boolean) {
             const aliasedTableName = template.__table__;
             const tableName = UtilityFunctions.dealias(aliasedTableName);
 
@@ -360,10 +360,8 @@ export namespace Knex {
                 return;
             }
 
-            let rootTemplate: SupertypeConstructor;
-
             while (template.__parent__) {
-                rootTemplate = template.__parent__;
+                template = template.__parent__;
             }
 
             // can skip the templates that were already processed.
@@ -469,7 +467,7 @@ export namespace Knex {
                     }
                 }
 
-                return Promise.all(promises);
+                return await Promise.all(promises);
 
                 async function processComment(columnName): Promise<void> {
                     let prop = columnNameToProp(columnName);
@@ -906,7 +904,7 @@ export namespace Knex {
          * @param {string} tableName table to drop
          * @returns {*}
          */
-        export function dropKnexTable(persistor: typeof PersistObjectTemplate, template: PersistentConstructor, tableName) {
+        export function dropKnexTable(persistor: typeof PersistObjectTemplate, template: PersistentConstructor, tableName?) {
             const knex = UtilityFunctions.getKnexConnection(persistor, template);
             tableName = tableName ? tableName : UtilityFunctions.dealias(template.__table__);
 
@@ -1116,10 +1114,13 @@ export namespace Knex {
                         }
                     }
 
-                    function callSave(obj) {
-                        return (obj.__template__ && obj.__template__.__schema__
-                            ? obj.persistSave(persistorTransaction, logger)
-                            : Promise.resolve(true));
+                    async function callSave(obj) {
+                        if (obj.__template__ && obj.__template__.__schema__) {
+                            return await obj.persistSave(persistorTransaction, logger);
+                        }
+                        else {
+                            return await true;
+                        }
                     }
                 }
 
@@ -1131,10 +1132,13 @@ export namespace Knex {
                         return 'delete';
                     }
 
-                    function callDelete(obj) {
-                        return (obj.__template__ && obj.__template__.__schema__
-                            ? obj.persistDelete(persistorTransaction, logger)
-                            : Promise.resolve(true))
+                    async function callDelete(obj) {
+                        if (obj.__template__ && obj.__template__.__schema__) {
+                            return await obj.perssitDelete(persistorTransaction, logger);
+                        }
+                        else {
+                            return true;
+                        }
                     }
                 }
 
@@ -1155,7 +1159,7 @@ export namespace Knex {
                     await Promise.all(deleteArray.map(async (obj: any) => {
                         delete deleteQueries[obj.name];  // Once scheduled for update remove it.
                         if (obj.template && obj.template.__schema__) {
-                            return await Knex.deleteFromKnexQuery(persistor, obj.template, obj.queryOrChains, persistorTransaction, logger)
+                            return await Knex.Database.deleteFromKnexQuery(persistor, obj.template, obj.queryOrChains, persistorTransaction, logger)
                         }
                         else {
                             return true;

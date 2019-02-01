@@ -21,6 +21,8 @@ export class Persistent extends Supertype {
     static __schema__: any;
     static __table__: any;
     static __parent__: typeof Persistent;
+    static __topTemplate: any;
+    static __propertiesInjected__: boolean;
 
     // New names
 
@@ -42,7 +44,7 @@ export class Persistent extends Supertype {
             return await Mongo.deleteByQuery(persistorRef, this, query, options.logger); //@TODO: this doesn't check if logger is set like the others
         }
         else {
-            return await PersistObjectTemplate.deleteFromKnexByQuery(this, query, options.transaction, options.logger);
+            return await Knex.Database.deleteFromKnexByQuery(this, query, options.transaction, options.logger);
         }
     }
 
@@ -120,7 +122,7 @@ export class Persistent extends Supertype {
                 return await Mongo.countByQuery(persistor, this, query, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger);
+                return await Knex.Query.countFromKnexQuery(this, query, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, { activity: 'persistorCountByQuery' });
@@ -306,7 +308,7 @@ export class Persistent extends Supertype {
         SchemaValidator.validate(options, 'persistSchema', this.__template__);
 
         options = options || {};
-        var txn = PersistObjectTemplate.getCurrentOrDefaultTransaction(options.transaction);
+        var txn = UtilityFunctions.getCurrentOrDefaultTransaction(this, options.transaction);
         var cascade = options.cascade;
 
         const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
@@ -811,7 +813,7 @@ export class Persistent extends Supertype {
             const refType = of || type;
 
             let template = this;
-            if (refType && refType.isObjectTemplate && UtilityFunctions._persistProperty(PersistObjectTemplate, defineProperty)) {
+            if (refType && refType.isObjectTemplate && UtilityFunctions._persistProperty(defineProperty)) {
                 var isCrossDocRef = PersistObjectTemplate.isCrossDocRef(template, prop, defineProperty)
                 if (isCrossDocRef || defineProperty.autoFetch) {
                     (function () {

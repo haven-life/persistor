@@ -35,6 +35,14 @@ export namespace UtilityFunctions {
         return !isDBMongo(persistor, collection);
     }
 
+    /**
+     * Mongo only 
+     *
+     * @export
+     * @param {typeof PersistObjectTemplate} persistor
+     * @param {*} obj
+     * @returns
+     */
     export function getCollectionByObject(persistor: typeof PersistObjectTemplate, obj) {
         const dbAlias = UtilityFunctions.getDBAlias(obj.__template__.__collection__);
         const db = UtilityFunctions.getDB(persistor, dbAlias).connection;
@@ -43,6 +51,14 @@ export namespace UtilityFunctions {
         return db.collection(dealias);
     }
 
+    /**
+     * Mongo only
+     *
+     * @export
+     * @param {typeof PersistObjectTemplate} persistor
+     * @param {*} template
+     * @returns
+     */
     export function getCollectionByTemplate(persistor: typeof PersistObjectTemplate, template) {
         const dbAlias = UtilityFunctions.getDBAlias(template.__collection__);
         const db = UtilityFunctions.getDB(persistor, dbAlias).connection;

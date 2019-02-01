@@ -2,10 +2,23 @@ import * as _ from 'underscore';
 import { PersistObjectTemplate } from './PersistObjectTemplate';
 import {Persistent, PersistentConstructor} from './Persistent';
 import { ObjectID } from 'mongodb';
+import * as knex from 'knex';
+
 export namespace UtilityFunctions {
 
-    export function getKnexConnection(persistor: typeof PersistObjectTemplate, template: PersistentConstructor) {
-        return UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection;
+    export function isKnexConnection(persistor: typeof PersistObjectTemplate, template: PersistentConstructor, connection): connection is knex {
+        return template.__table__ && isDBKnex(persistor, template.__table__);
+    }
+
+    export function getKnexConnection(persistor: typeof PersistObjectTemplate, template: PersistentConstructor): knex {
+        const connection = UtilityFunctions.getDB(persistor, UtilityFunctions.getDBAlias(template.__table__)).connection;
+
+        if (isKnexConnection(persistor, template, connection)) {
+            return connection;
+        }
+        else {
+            throw new Error(`Expecting connection to be Knex, but is actually mongo`);
+        }
     }
 
     export function getDBType(persistor: typeof PersistObjectTemplate, collection) {

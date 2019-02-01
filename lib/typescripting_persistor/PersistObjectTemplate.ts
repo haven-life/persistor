@@ -11,6 +11,7 @@ import { Schema } from './Schema';
 import { SchemaValidator } from './SchemaValidator';
 import { UtilityFunctions } from './UtilityFunctions';
 import { Mongo } from './Mongo';
+import { Knex } from './Knex';
 type Transaction = {
     id: number,
     dirtyObjects: Object,
@@ -36,6 +37,8 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static currentTransaction: Transaction;
     static dirtyObjects: any;
     static savedObjects: {};
+
+    static MarkChangedArrayReferences: any;
 
     // instance of Knex
     static _db: {[key: string]: {connection: knex | MongoClient, type: KnexOrMongo}};
@@ -262,7 +265,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
         if (txn && obj.__template__.__schema__.cascadeSave && !noCascade) {
 
             // Potentially cascade to set other related objects as dirty
-            topObject = PersistObjectTemplate.getTopObject(obj);
+            topObject = UtilityFunctions.getTopObject(this, obj);
 
             if (!topObject) {
                 usedLogger.error(
@@ -275,14 +278,14 @@ export class PersistObjectTemplate extends ObjectTemplate {
 
             if (topObject && topObject.__template__.__schema__.cascadeSave) {
 
-                const newTopObject = PersistObjectTemplate.getTopObject(obj);
+                const newTopObject = UtilityFunctions.getTopObject(this, obj);
 
-                PersistObjectTemplate.enumerateDocumentObjects(newTopObject, (obj) => {
+                UtilityFunctions.enumerateDocumentObjects(this, newTopObject, (obj) => {
                     if (!onlyIfChanged || obj.__changed__) {
                         (txn ? txn.dirtyObjects : this.dirtyObjects)[obj.__id__] = obj;
                         // Touch the top object if required so that if it will be modified and can be refereshed if needed
                         if (txn && txn.touchTop && obj.__template__.__schema__) {
-                            let topObject = PersistObjectTemplate.getTopObject(obj);
+                            let topObject = UtilityFunctions.getTopObject(this, obj);
                             if (topObject) {
                                 txn.touchObjects[topObject.__id__] = topObject;
                             }
@@ -293,7 +296,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
         }
 
         if (txn && txn.touchTop && obj.__template__.__schema__) {
-            topObject = PersistObjectTemplate.getTopObject(obj);
+            topObject = UtilityFunctions.getTopObject(this, obj);
             if (topObject) {
                 txn.touchObjects[topObject.__id__] = topObject;
             }
@@ -375,8 +378,8 @@ export class PersistObjectTemplate extends ObjectTemplate {
         const prefix = this.dealias(template.__collection__);
         
         let pojos;
-        if (UtilityFunctions.isDBMongo(this, __template__.__collection__)) {
-            pojos = await Mongo.getPOJOByQuery(this, template, query, options, logger);
+        if (UtilityFunctions.isDBMongo(this, template.__collection__)) {
+            return await Mongo.getPOJOByQuery(this, template, query, options, logger);
         }
         else {
             pojos = await this.getPOJOsFromKnexQuery(template, [], query, options, undefined, logger);
@@ -427,7 +430,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
         const persistorTransaction: Transaction = options.transaction || this.__defaultTransaction__;
 
         if (PersistObjectTemplate.DB_Knex) {
-            return await PersistObjectTemplate._commitKnex(persistorTransaction, logger, options.notifyChanges);
+            return await Knex.Query._commitKnex(this, persistorTransaction, logger, options.notifyChanges);
         }
     }
 

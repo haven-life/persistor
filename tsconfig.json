@@ -9,7 +9,6 @@
     ],
     "exclude": [
         "./test/**/*.ts",
-        "./index.d.ts",
-        "./lib/persistable.ts"
+        "lib/old_persistor/**/*"
     ]
 }

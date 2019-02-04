@@ -48,7 +48,7 @@
     "scripts": {
         "lint": "eslint .",
         "coverage": "nyc mocha --exit -- test/* -R spec",
-        "compile": "tsc -p ./tsconfig.json && cp index.d.ts dist/ && cp ./lib/persistable.ts dist/lib/",
+        "compile": "tsc -p ./tsconfig.json",
         "compile:tests": "tsc -p ./test/supertype/tsconfig.test.json",
         "compile:all": "npm run compile && npm run compile:tests",
         "prepublishOnly": "npm run compile",

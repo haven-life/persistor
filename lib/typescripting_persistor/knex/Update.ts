@@ -136,7 +136,7 @@ export namespace Update {
                     });
                     
                     if (schema.children[prop].pruneOrphans && obj[objProp].isFetched) {
-                        promises.push(await Database.knexPruneOrphans(persistor, obj, prop, txn, foreignFilterKey, foreignFilterValue, logger));
+                        promises.push(Database.knexPruneOrphans(persistor, obj, prop, txn, foreignFilterKey, foreignFilterValue, logger));
                     }
                 }
 
@@ -190,7 +190,7 @@ export namespace Update {
             }
         });
         
-        promises.push(await Database.saveKnexPojo(persistor, obj, pojo, isDocumentUpdate ? obj._id : null, txn, logger));
+        promises.push(Database.saveKnexPojo(persistor, obj, pojo, isDocumentUpdate ? obj._id : null, txn, logger));
 
         await Promise.all(promises);
         return obj;

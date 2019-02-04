@@ -1,7 +1,7 @@
 import * as _ from 'underscore';
 import { PersistObjectTemplate } from '../PersistObjectTemplate';
 import { UtilityFunctions } from '../UtilityFunctions';
-import { Persistent } from '../Persistent';
+import { Persistent, PersistentConstructor } from '../Persistent';
 import * as knexImport from 'knex';
 import { SupertypeConstructor } from 'supertype';
 
@@ -90,7 +90,7 @@ export namespace Database {
             map[selectString] = [];
         }
 
-        return select()
+        return await select
             .then(processResults)
             .then(processError);
 

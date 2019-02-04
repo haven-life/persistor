@@ -146,7 +146,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 data: {template: template.__name__, id: id}});
             var dbType = PersistObjectTemplate.getDB(PersistObjectTemplate.getDBAlias(template.__collection__)).type;
             let getQuery = (dbType == PersistObjectTemplate.DB_Mongo ?
-                PersistObjectTemplate.getFromPersistWithMongoId(template, id, cascade, isTransient, idMap, logger) :
+                mongo.Mongo.getFromPersistWithMongoId(PersistObjectTemplate, template, id, cascade, isTransient, idMap, logger) :
                 PersistObjectTemplate.getFromPersistWithKnexId(template, id, cascade, isTransient, idMap, isRefresh, logger))
                 .then(function(res) {
                     return res;
@@ -174,7 +174,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 data: {template: template.__name__}});
             var dbType = PersistObjectTemplate.getDB(PersistObjectTemplate.getDBAlias(template.__collection__)).type;
             let getQuery = (dbType == PersistObjectTemplate.DB_Mongo ?
-                PersistObjectTemplate.getFromPersistWithMongoQuery(template, query, cascade, start, limit, isTransient, idMap, options, logger) :
+                mongo.Mongo.getFromPersistWithMongoQuery(PersistObjectTemplate, template, query, cascade, start, limit, isTransient, idMap, options, logger) :
                 PersistObjectTemplate.getFromPersistWithKnexQuery(null, template, query, cascade, start, limit, isTransient, idMap, options, undefined, undefined, logger))
                 .then(function(res) {
                     return res;
@@ -217,7 +217,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
             });
             var dbType = persistObjectTemplate.getDB(persistObjectTemplate.getDBAlias(template.__collection__)).type;
             let fetchQuery = (dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.getFromPersistWithMongoId(template, id, options.fetch, options.transient, null, options.logger) :
+                mongo.Mongo.getFromPersistWithMongoId(PersistObjectTemplate, template, id, options.fetch, options.transient, null, options.logger) :
                 persistObjectTemplate.getFromPersistWithKnexId(template, id, options.fetch, options.transient, null, null, options.logger, options.enableChangeTracking, options.projection));
             return fetchQuery.catch(e => logExceptionAndRethrow(e, options.logger || persistObjectTemplate.logger, template.__name__, id, 'persistorFetchById'));
         };
@@ -257,7 +257,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
                 options.order = { sort: options.order };
             }
             let fetchQuery = (dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.getFromPersistWithMongoQuery(template, query, options.fetch, options.start,
+                mongo.Mongo.getFromPersistWithMongoQuery(persistObjectTemplate, template, query, options.fetch, options.start,
                             options.limit, options.transient, options.order, options.order, logger) :
                 persistObjectTemplate.getFromPersistWithKnexQuery(null, template, query, options.fetch, options.start,
                             options.limit, options.transient, null, options.order,
@@ -467,13 +467,14 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
             }
             this.__propertiesInjected__ = true;
         }
-    }
-    PersistObjectTemplate._injectObjectFunctions = function (template) {
+    };
 
+    PersistObjectTemplate._injectObjectFunctions = function (template) {
         var self = this; // this is the objectTemplate for non-TS apps or daemons or other non-sessionized use-cases
 
         template.prototype.persistSave = // Legacy
         function (txn, logger) {
+            console.log("what is this?", this);
             var persistObjectTemplate = this.__objectTemplate__ || self;
             (logger || persistObjectTemplate.logger).debug({component: 'persistor', module: 'api', activity: 'persistSave',
                 data: {template: this.__template__.__name__, id: this.__id__}});
@@ -570,7 +571,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
 
             var dbType = persistObjectTemplate.getDB(persistObjectTemplate.getDBAlias(this.__template__.__collection__)).type;
             return dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, idMap, cascadeTop, this, properties, isTransient, logger) :
+                mongo.Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, idMap, cascadeTop, this, properties, isTransient, logger) :
                 persistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascadeTop, isTransient, null, this, properties, undefined, undefined, undefined, logger);
 
         };
@@ -590,16 +591,12 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
             var previousDirtyTracking = persistObjectTemplate.__changeTracking__;
             persistObjectTemplate.__changeTracking__ = false;
             return (dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, idMap, cascade, this, properties, isTransient, logger) :
+                mongo.Mongo.getTemplateFromPOJO(persistObjectTemplate, this, this.__template__, null, null, idMap, cascade, this, properties, isTransient, logger) :
                 persistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascade, isTransient, null, this, properties, undefined, undefined, undefined, logger))
                 .then(function (res) {
-                    return res;
-                })
-                .finally(function () {
                     persistObjectTemplate.__changeTracking__ = previousDirtyTracking;
+                    return res;
                 });
-
-
         };
 
         template.prototype.persistorFetchReferences = template.prototype.fetchReferences = async function(options) {
@@ -620,7 +617,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
             }
             var dbType = persistObjectTemplate.getDB(persistObjectTemplate.getDBAlias(this.__template__.__collection__)).type;
             return (dbType == persistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.getTemplateFromMongoPOJO(this, this.__template__, null, null, {},
+                mongo.Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, {},
                     options.fetch, this, properties, options.transient, logger) :
                 persistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, {},
                     options.fetch, options.transient, null, this,
@@ -634,7 +631,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
             var dbType = persistObjectTemplate.getDB(persistObjectTemplate.getDBAlias(template.__collection__)).type;
             //return this.__template__.getFromPersistWithId(this._id, null, null, null, true, logger)
             return (dbType == PersistObjectTemplate.DB_Mongo ?
-                persistObjectTemplate.getFromPersistWithMongoId(template, this._id, null, null, null, logger) :
+                mongo.Mongo.getFromPersistWithMongoId(PersistObjectTemplate, template, this._id, null, null, null, logger) :
                 persistObjectTemplate.getFromPersistWithKnexId(template, this._id, null, null, null, true, logger));
 
         };

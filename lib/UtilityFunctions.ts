@@ -182,13 +182,19 @@ export namespace UtilityFunctions {
 
     // persistObjectTemplate.getTemplateByCollection
     export function getTemplateByCollection(persistor, collection) {
-        Object.keys(persistor._schema).forEach((prop) => {
-            if (persistor._schema[prop].documentOf == collection) {
-                return persistor.getTemplateByName(prop);
-            }
-        });
+        // Object.keys(persistor._schema).forEach((prop) => {
+        //     if (persistor._schema[prop].documentOf == collection) {
+        //         return persistor.getTemplateByName(prop);
+        //     } else {
+        //         throw new Error(`Cannot find template for ${collection}`);
+        //     }
+        // });
 
-        throw new Error(`Cannot find template for ${collection}`);
+        // TODO figure out how to refactor this correctly
+        for (let prop in persistor._schema)
+            if (persistor._schema[prop].documentOf === collection)
+                return persistor.getTemplateByName(prop);
+        throw new Error('Cannot find template for ' + collection);
     }
 
     //  pOT.checkObject

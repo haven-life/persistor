@@ -46,7 +46,7 @@ export class Persistent extends Supertype {
             return await Mongo.deleteByQuery(persistorRef, this, query, options.logger); //@TODO: this doesn't check if logger is set like the others
         }
         else {
-            return await Knex.Database.deleteFromKnexByQuery(this, query, options.transaction, options.logger);
+            return await Knex.Database.deleteFromKnexByQuery(persistorRef, query, options.transaction, options.logger);
         }
     }
 
@@ -124,7 +124,7 @@ export class Persistent extends Supertype {
                 return await Mongo.countByQuery(persistor, this, query, usedLogger);
             }
             else {
-                return await Knex.Query.countFromKnexQuery(this, query, usedLogger);
+                return await Knex.Database.countFromKnexQuery(persistor, this, query, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, { activity: 'persistorCountByQuery' });
@@ -300,7 +300,7 @@ export class Persistent extends Supertype {
             return await Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, {}, options.fetch, this, properties, options.transient, usedLogger);
         }
         else {
-            return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, {}, options.fetch, options.transient, null, this, properties, undefined, undefined, undefined, usedLogger)
+            return await Knex.Query.getTemplateFromKnexPOJO(PersistObjectTemplate, this, this.__template__, null, {}, options.fetch, options.transient, null, this, properties, undefined, undefined, undefined, usedLogger)
         }
     }
 
@@ -308,7 +308,7 @@ export class Persistent extends Supertype {
         SchemaValidator.validate(options, 'persistSchema', this.__template__);
 
         options = options || {};
-        var txn = UtilityFunctions.getCurrentOrDefaultTransaction(this, options.transaction);
+        var txn = UtilityFunctions.getCurrentOrDefaultTransaction(PersistObjectTemplate, options.transaction);
         var cascade = options.cascade;
 
         const usedLogger = options.logger ? options.logger : PersistObjectTemplate.logger;
@@ -352,7 +352,7 @@ export class Persistent extends Supertype {
             return await Mongo.findById(PersistObjectTemplate, this.__template__, this._id, null, null, null, usedLogger);
         }
         else {
-            return await PersistObjectTemplate.getFromPersistWithKnexId(this.__template__, this._id, null, null, null, true, usedLogger);
+            return await Knex.Query.getFromPersistWithKnexId(PersistObjectTemplate, this.__template__, this._id, null, null, null, true, usedLogger);
         }
     }
     
@@ -437,7 +437,7 @@ export class Persistent extends Supertype {
                 return await Mongo.findById(PersistObjectTemplate, this, id, cascade, isTransient, idMap, logger);
             }
             else {
-                return await PersistObjectTemplate.getFromPersistWithKnexId(this, id, cascade, isTransient, idMap, isRefresh, logger);
+                return await Knex.Query.getFromPersistWithKnexId(PersistObjectTemplate, this, id, cascade, isTransient, idMap, isRefresh, logger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, id, 'getFromPersistWithId')
@@ -478,7 +478,7 @@ export class Persistent extends Supertype {
                 return await Mongo.findByQuery(PersistObjectTemplate, this, query, cascade, start, limit, isTransient, idMap, options, logger);
             }
             else {
-                return await Knex.Database.getFromPersistWithKnexQuery(null, this, query, cascade, start, limit, isTransient, idMap, options, undefined, undefined, logger);
+                return await Knex.Query.getFromPersistWithKnexQuery(PersistObjectTemplate, null, this, query, cascade, start, limit, isTransient, idMap, options, undefined, undefined, logger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, 'getFromPersistWithQuery');
@@ -502,7 +502,7 @@ export class Persistent extends Supertype {
             return await Mongo.deleteByQuery(PersistObjectTemplate, this, query, logger);
         }
         else {
-            return await PersistObjectTemplate.deleteFromKnexQuery(this, query, txn, logger);
+            return await Knex.Database.deleteFromKnexQuery(PersistObjectTemplate, this, query, txn, logger);
         }
     }
 
@@ -534,7 +534,7 @@ export class Persistent extends Supertype {
                 return await Mongo.deleteById(PersistObjectTemplate, this, id, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.deleteFromKnexId(this, id, txn, usedLogger);
+                return await Knex.Database.deleteFromKnexId(PersistObjectTemplate, this, id, txn, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, id, { activity: 'deleteFromPersistWithId' });
@@ -568,7 +568,7 @@ export class Persistent extends Supertype {
                 return await Mongo.countByQuery(PersistObjectTemplate, this, query, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.countFromKnexQuery(this, query, usedLogger);
+                return await Knex.Database.countFromKnexQuery(PersistObjectTemplate, this, query, usedLogger);
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, query, 'countFromPersistWithQuery');
@@ -606,7 +606,7 @@ export class Persistent extends Supertype {
             return await Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, idMap, cascadeTop, this, properties, isTransient, usedLogger);
         }
         else {
-            return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascadeTop, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
+            return await Knex.Query.getTemplateFromKnexPOJO(PersistObjectTemplate, this, this.__template__, null, idMap, cascadeTop, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
         }
     }
 
@@ -640,7 +640,7 @@ export class Persistent extends Supertype {
                 return await Mongo.getTemplateFromPOJO(PersistObjectTemplate, this, this.__template__, null, null, idMap, cascade, this, properties, isTransient, usedLogger);
             }
             else {
-                return await PersistObjectTemplate.getTemplateFromKnexPOJO(this, this.__template__, null, idMap, cascade, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
+                return await Knex.Query.getTemplateFromKnexPOJO(PersistObjectTemplate, this, this.__template__, null, idMap, cascade, isTransient, null, this, properties, undefined, undefined, undefined, usedLogger);
             }
         }
         finally {
@@ -691,7 +691,7 @@ export class Persistent extends Supertype {
             return await returnVal._id.toString(); //@TODO: do we need to await here? we already awaited returnval
         }
         else {
-            const returnVal = await Knex.Query.persistSaveKnex(this, txn, logger);
+            const returnVal = await Knex.Update.persistSaveKnex(PersistObjectTemplate, this, txn, logger);
             if (txn) {
                 UtilityFunctions.saved(PersistObjectTemplate, returnVal, txn);
             }
@@ -719,11 +719,11 @@ export class Persistent extends Supertype {
 
         //@TODO: Ask srksag how come there's no catch for errors here
 
-        if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__template__.__collection__)) {
-            return await Mongo.persistSave(PersistObjectTemplate, this, undefined, undefined, undefined, txn, logger);
+        if (UtilityFunctions.isDBMongo(persistObjectTemplate, this.__template__.__collection__)) {
+            return await Mongo.persistSave(persistObjectTemplate, this, undefined, undefined, undefined, txn, logger);
         }
         else {
-            return await persistObjectTemplate.persistTouchKnex(this, txn, logger);
+            return await Knex.Database.persistTouchKnex(persistObjectTemplate, this, txn, logger);
         }
     }
 

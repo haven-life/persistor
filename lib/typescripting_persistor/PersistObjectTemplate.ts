@@ -472,7 +472,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
     * @returns {*|Array}
     */
     static async syncAllTables() {
-        let results = await this.onAllTables(async (template) => await Knex.Database..synchronizeKnexTableFromTemplate(this, template));
+        let results = await this.onAllTables(async (template) => await Knex.Database.synchronizeKnexTableFromTemplate(this, template));
         return await Promise.all(results);
     }
     /**

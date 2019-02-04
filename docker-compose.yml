@@ -26,6 +26,8 @@ services:
       - database-test
     environment:
       - logLevel=info
+    volumes:
+        - ./:/app
     env_file:
       - ./test.env
     command: ./wait-for-it.sh database-test:5432 -- ./wait-for-it.sh mongo:27017 -- npm run test

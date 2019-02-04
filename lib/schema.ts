@@ -1,73 +1,80 @@
-module.exports = function (PersistObjectTemplate) {
+import * as _ from 'underscore';
+import { PersistObjectTemplate } from './PersistObjectTemplate';
 
-    var _ = require('underscore');
 
-
-    PersistObjectTemplate.setSchema = function (schema) {
-        this._schema = schema;
+function getBaseClass(template) {
+    while (template.__parent__) {
+        template = template.__parent__
     }
 
-    PersistObjectTemplate.appendSchema = function (schema) {
+    return template;
+}
+
+
+export namespace Schema {
+
+    export function setSchema(persistor: typeof PersistObjectTemplate, schema) {
+        persistor._schema = schema;
+    }
+
+    export function appendSchema(persistor: typeof PersistObjectTemplate, schema) {
         Object.keys(schema).forEach(key => {
-            this._schema[key] = schema[key];
+            persistor._schema[key] = schema[key];
         });
 
-        PersistObjectTemplate._verifySchema();
+        persistor._verifySchema();
     }
 
     /**
-     * Run through the schema entries and setup these properites on templates
-     *  __schema__: the schema for each template
-     *  __collection__: the name of the Mongo Collection
-     *  __topTemplate__: for a template that represents a subDocument the template that is primary for that colleciton
-     * @private
-     */
-    PersistObjectTemplate._verifySchema = function ()
-    {
+    * Run through the schema entries and setup these properites on templates
+    *  __schema__: the schema for each template
+    *  __collection__: the name of the Mongo Collection
+    *  __topTemplate__: for a template that represents a subDocument the template that is primary for that colleciton
+    */
+    export function _verifySchema(persistor: typeof PersistObjectTemplate) {
         var templateName, template, key, defaultTable;
-        var schema = this._schema;
-        if (!schema)
-            return;
+        var schema = persistor._schema;
 
-        // Helper to get the base class walking the __parent__ chain
-        function getBaseClass(template) {
-            while (template.__parent__)
-                template = template.__parent__
-            return template;
+        if (!schema) {
+            return;
         }
 
         // Establish a hash of collections keyed by collection name that has the main template for the collection
         var collections = {};
         for (templateName in schema) {
-            template = this.getTemplateByName(templateName);
+            template = persistor.getTemplateByName(templateName);
             if (template && schema[templateName].documentOf) {
 
-                if (collections[schema[templateName].documentOf] &&
-                    collections[schema[templateName].documentOf] != getBaseClass(template))
-                    throw new Error(templateName + ' and ' + collections[schema[templateName].documentOf]._name +
-                        ' are both defined to be top documents of ' + schema[templateName].documentOf);
+                if (collections[schema[templateName].documentOf] && collections[schema[templateName].documentOf] != getBaseClass(template)) {
+                    throw new Error(`${templateName} and ${collections[schema[templateName].documentOf]._name} are both defined to be top documents of ${schema[templateName].documentOf}`);
+                }
+                
                 collections[schema[templateName].documentOf] = getBaseClass(template);
             }
         }
 
         // For any templates with subdocuments fill in the __topTemplate__
         for (templateName in schema) {
-            template = this.getTemplateByName(templateName)
+            template = persistor.getTemplateByName(templateName)
             if (template && schema[templateName].subDocumentOf)
                 template.__topTemplate__ = collections[schema[templateName].subDocumentOf];
         }
 
         // Fill in the __schema__ and __collection properties
-        for (templateName in this._schema) {
-            template = this.__dictionary__[templateName];
+        for (templateName in persistor._schema) {
+
+            template = persistor.__dictionary__[templateName];
+
             if (template) {
-                template.__schema__ = this._schema[template.__name__];
+                template.__schema__ = persistor._schema[template.__name__];
                 template.__collection__ = template.__schema__ ?
                     template.__schema__.documentOf || template.__schema__.subDocumentOf || template.__name__ : null;
-                if (template.__schema__ && template.__schema__.table)
+                
+                if (template.__schema__ && template.__schema__.table) {
                     template.__table__ = template.__schema__.table;
-                var parentTemplate = template.__parent__;
+                }
 
+                var parentTemplate = template.__parent__;
                 defaultTable = template.__schema__ ? template.__schema__.documentOf || template.__schema__.subDocumentOf || template.__name__ : null;
 
                 // Inherit foreign keys and tables from your parents
@@ -97,16 +104,19 @@ module.exports = function (PersistObjectTemplate) {
             }
         }
         // Add indexes for one-to-many foreign key relationships, primary keys automatically added by syncTable
-        if (!PersistObjectTemplate.noAutoIndex && !this._schema.__indexed__) {
+        if (!persistor.noAutoIndex && !persistor._schema.__indexed__) {
             var indexes = {}
-            for (templateName in this._schema) {
-                template = PersistObjectTemplate.__dictionary__[templateName];
+
+            for (templateName in persistor._schema) {
+                
+                template = persistor.__dictionary__[templateName];
                 if (template) {
-                    addFKIndexes.call(this, this._schema[templateName], template, templateName)
+                    addFKIndexes.call(persistor, persistor._schema[templateName], template, templateName)
                 }
             }
         }
-        this._schema.__indexed__ = true;
+        
+        persistor._schema.__indexed__ = true;
 
 
         function addFKIndexes(schema, template, _templateName) {
@@ -125,26 +135,29 @@ module.exports = function (PersistObjectTemplate) {
                 if (parentTemplate && parentTemplate.type) {
                     propType = parentTemplate.type === Array ? parentTemplate.of : parentTemplate.type;
                     if (!propType.__name__) {
-                        throw new Error('getType attribute is missing for ' + prop + ' in ' + template.name);
+                        throw new Error(`getType attribute is missing for ${prop} in ${template.name}`);
                     }
                 }
 
-                var parentSchema = (parentTemplate && parentTemplate.type && this.__dictionary__[propType.__name__]) ? this.__dictionary__[propType.__name__].__schema__ : null;
+                var parentSchema = (parentTemplate && parentTemplate.type && persistor.__dictionary__[propType.__name__]) ? 
+                                        persistor.__dictionary__[propType.__name__].__schema__ : null;
+
                 var isOTM = (parentSchema && parentSchema.children) ?
-                    !!_.find(parentSchema.children, function(child) { return child.id == val.id}) : false;
+                    !!_.find(parentSchema.children, function (child: any) { return child.id == val.id }) : false;
 
                 // Add the entry mindful of avoiding duplicates
                 schema.indexes = schema.indexes || [];
                 var keyName = 'idx_' + schema.table + '_fk_' + val.id;
                 if (isOTM && !indexes[keyName]) {
                     indexes[keyName] = true;
-                    schema.indexes.push({name: keyName, def: {columns: [val.id], type: 'index'}});
+                    schema.indexes.push({ name: keyName, def: { columns: [val.id], type: 'index' } });
                 }
             }
         }
-    };
+    }
 
-    PersistObjectTemplate.isCrossDocRef = function (template, prop, defineProperty) {
+
+    export function isCrossDocRef(persistor: typeof PersistObjectTemplate, template, prop, defineProperty) {
         var schema = getSchema(template);
         var type = defineProperty.type;
         var of = defineProperty.of;
@@ -174,5 +187,6 @@ module.exports = function (PersistObjectTemplate) {
             return template.__schema__;
         }
     }
+
 
 }

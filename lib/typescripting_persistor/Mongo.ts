@@ -303,6 +303,8 @@ export namespace Mongo {
                                     }, 'updated it\'s foreign key');
                                 }
 
+                                console.log(value[ix]);
+
                                 // If we were waiting to resolve where this should go let's just put it here
                                 if ((typeof (value[ix]._id) == 'function')) {   // This will resolve the id and it won't be a function anymore
                                     usedLogger.debug({

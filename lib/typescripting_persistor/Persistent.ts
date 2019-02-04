@@ -6,7 +6,7 @@ import { UtilityFunctions } from './UtilityFunctions';
 import { ObjectID } from 'mongodb';
 import { SchemaValidator } from './SchemaValidator';
 import { Mongo } from './Mongo';
-import { DefinePropertyType } from 'supertype/dist/Supertype';
+import { DefinePropertyType } from 'supertype';
 import { Knex } from './Knex';
 
 

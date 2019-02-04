@@ -20,8 +20,6 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      * PUBLIC INTERFACE FOR OBJECTS
      */
 
-
-    // @DONE - moved to ts
     PersistObjectTemplate.getPersistorProps = function () {
         var persistorProps = {};
         _.each(PersistObjectTemplate.__dictionary__, processTemplate);
@@ -46,16 +44,11 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      *
      * @param {supertype} template - load all parent/child/subdocument/subsetof defitions
      */
-
-    //    // @DONE - moved to ts
     PersistObjectTemplate._injectIntoTemplate = function (template) {
         this._prepareSchema(template);
         this._injectTemplateFunctions(template);
         this._injectObjectFunctions(template);
     }
-
-        // @DONE - moved to ts
-
     PersistObjectTemplate._prepareSchema = function (template) {
         if (!this.schemaVerified) {
             this._verifySchema();
@@ -850,8 +843,7 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
         var prefix = PersistObjectTemplate.dealias(template.__collection__);
         return dbType == PersistObjectTemplate.DB_Mongo ?
             PersistObjectTemplate.getPOJOFromMongoQuery(template, query, options, logger) :
-            // TODO NICK why do we need to pass in an empty array here??
-            PersistObjectTemplate.getPOJOsFromKnexQuery(PersistObjectTemplate, template, [], query, options, undefined, logger).then(function (pojos) {
+            PersistObjectTemplate.getPOJOsFromKnexQuery(template, [], query, options, undefined, logger).then(function (pojos) {
                 pojos.forEach(function (pojo) {
                     _.map(pojo, function(_val, prop) {
                         if (prop.match(RegExp('^' + prefix + '___'))) {

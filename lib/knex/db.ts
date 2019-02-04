@@ -205,7 +205,7 @@ module.exports = function (PersistObjectTemplate) {
      * @param {string} indexName index name to drop
      * @constructor
      */
-    PersistObjectTemplate.dropIfKnexIndexExists = function (template, indexName) {
+    PersistObjectTemplate.DropIfKnexIndexExists = function (template, indexName) {
         var tableName = this.dealias(template.__table__);
         var knex = this.getDB(this.getDBAlias(template.__table__)).connection;
         if (indexName.indexOf('idx_') === -1)

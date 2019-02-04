@@ -1,9 +1,10 @@
 import {Supertype, supertypeClass, property, Persistable} from '../../dist/index';
 import {Role} from './Role';
 import {Address} from './Address';
+import { Persistent } from '../../dist/lib/persistable';
 
 @supertypeClass
-export class Customer extends Persistable(Supertype) {
+export class Customer extends Persistent {
 
     constructor (first, middle, last) {
         super();
@@ -11,6 +12,10 @@ export class Customer extends Persistable(Supertype) {
         this.lastName = last;
         this.middleName = middle;
         this.setDirty();
+    }
+
+    static sup() {
+        Customer.persistorFetchByQuery(null, {fetch: {primaryAddresses: true, secondaryAddresses: true}})
     }
 
     @property()

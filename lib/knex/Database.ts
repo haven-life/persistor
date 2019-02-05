@@ -576,8 +576,11 @@ export namespace Database {
                 if (knex.client.config.client === 'pg' && comment !== '') {
                     const rawSql = `COMMENT ON COLUMN "${table}"."${column}" IS '${comment.replace(/'/g, '\'\'')}';`;
 
-                    const retVal = await knex.raw(rawSql);
-                    console.log(retVal);
+                    try {
+                        return await knex.raw(rawSql);
+                    } catch (e) {
+                        console.log(e);
+                    }
                 }
             }
         }
@@ -700,6 +703,7 @@ export namespace Database {
                 _changes[tableName][key] = _changes[tableName][key] || [];
                 _changes[tableName][key].push.apply(_changes[tableName][key], track[key]);
             });
+            debugger;
 
             function _diff(masterTblSchema, shadowTblSchema, opr, addMissingTable, addPredicate, diffs) {
 
@@ -720,11 +724,11 @@ export namespace Database {
             }
         };
 
-        const generateChanges = (localTemplate) => {
+        function generateChanges(localTemplate, _value) {
             return _.reduce(localTemplate.__children__, (_curr: SupertypeConstructor, o: SupertypeConstructor) => {
                 let tableDefinition = loadTableDef(_dbschema, o.__name__);
                 let diff = diffTable(tableDefinition.dbschema, tableDefinition.schema, tableDefinition.tableName);
-                return generateChanges(diff);
+                return generateChanges(o, diff);
             }, {});
         };
 
@@ -831,8 +835,8 @@ export namespace Database {
         try {
             const loadedSchema = await loadSchema(tableName);
             const loadedTableDef = loadTableDef(loadedSchema.schema, loadedSchema.tableName);
-            diffTable(loadedTableDef.dbschema, loadedTableDef.schema, loadedTableDef.tableName);
-            generateChanges(template);
+            const diff = diffTable(loadedTableDef.dbschema, loadedTableDef.schema, loadedTableDef.tableName);
+            generateChanges(template, diff);
             const dbChanges = mergeChanges();
             await applyTableChanges(dbChanges);
             return await makeSchemaUpdates();

@@ -310,7 +310,7 @@ export namespace Mongo {
                                         component: 'persistor', module: 'update.persistSaveMongo',
                                         activity: 'processing'
                                     }, prop + ' waiting for placement, ebmed as subdocument');
-                                    values.push(persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
+                                    values.push(await persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
                                 }
                                 // If it was this placed another document or another place in our document
                                 // we don't add it as a sub-document
@@ -318,7 +318,7 @@ export namespace Mongo {
                                     value[ix]._id.replace(/:.*/, '') != masterId))          // or in another doc
                                 {
                                     if (value[ix].__dirty__) // If dirty save it
-                                        promises.push(persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
+                                        promises.push(await persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
                                     continue;  // Skip saving it as a sub-doc
                                 }
                                 // Save as sub-document
@@ -326,12 +326,12 @@ export namespace Mongo {
                                     component: 'persistor', module: 'update.persistSaveMongo',
                                     activity: 'processing'
                                 }, 'Saving subdocument ' + prop);
-                                values.push(persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
+                                values.push(await persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
                             } else {
                                 if (value[ix]._id && idMap[value[ix]._id.toString()]) // Previously referenced objects just get the id
                                     values.push(value[ix]._id.toString());
                                 else // Otherwise recursively obtain pojo
-                                    values.push(persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
+                                    values.push(await persistSave(persistor, value[ix], promises, masterId, idMap, txn, logger));
                             }
 
                         }
@@ -353,7 +353,7 @@ export namespace Mongo {
                                     component: 'persistor', module: 'update.persistSaveMongo',
                                     activity: 'processing'
                                 }, 'Saving ' + prop + ' as document because we updated it\'s foreign key');
-                                promises.push(persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
+                                promises.push(await persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
                             }
                         }
                 }
@@ -378,7 +378,7 @@ export namespace Mongo {
                     // If an a different collection we have to get the id generated
                     else {
                         // This should cause an id to be generated eventually
-                        promises.push(persistSave(persistor, value, promises, null, idMap, txn, logger));
+                        promises.push(await persistSave(persistor, value, promises, null, idMap, txn, logger));
                         // If it is not generated then queue up a function to set it when we get 'round to it
 
                         {
@@ -416,7 +416,7 @@ export namespace Mongo {
                     }
                     pojo[foreignKey] = value ? new ObjectID(obj[foreignKey]) : null;
                     if (value && value.__dirty__)
-                        promises.push(persistSave(persistor, value, promises, null, idMap, txn, logger));
+                        promises.push(await persistSave(persistor, value, promises, null, idMap, txn, logger));
                 }
             }
             else if (defineProperty.type == Date)
@@ -426,7 +426,7 @@ export namespace Mongo {
         }
 
         if (savePOJO)
-            promises.push(save(persistor, obj, pojo, isDocumentUpdate ? new ObjectID(obj._id) : null, txn, logger));
+            promises.push(await save(persistor, obj, pojo, isDocumentUpdate ? new ObjectID(obj._id) : null, txn, logger));
 
 
         // @TODO: we may not resolvePromises, is that alright?
@@ -561,7 +561,7 @@ export namespace Mongo {
         obj[closurePersistorProp] = copyProps(obj[closurePersistorProp]);
 
         // not sure if this is right syntax
-        return promises.push(true);
+        return promises.push(await true);
 
     }
 

@@ -6,12 +6,13 @@ import * as MongoClient from 'mongodb-bluebird';
 import { db as DefaultDB } from './index';
 
 import * as knex from 'knex';
-import { PersistentConstructor } from './Persistent';
+import { PersistentConstructor, Persistent } from './Persistent';
 import { Schema } from './Schema';
 import { SchemaValidator } from './SchemaValidator';
 import { UtilityFunctions } from './UtilityFunctions';
 import { Mongo } from './Mongo';
 import { Knex } from './Knex';
+import { Injections } from './js_holdover/Injections';
 type Transaction = {
     id: number,
     dirtyObjects: Object,
@@ -30,13 +31,14 @@ type KnexOrMongo = 'knex' | 'mongo';
 
 export class PersistObjectTemplate extends ObjectTemplate {
 
+    static jsPath = false;
     static DB_Knex = 'knex';
     static DB_Mongo = 'mongo';
     static schemaVerified: boolean;
     static baseClassForPersist: typeof ObjectTemplate;
     static currentTransaction: Transaction;
-    static dirtyObjects: any;
-    static savedObjects: {};
+    static dirtyObjects = {};
+    static savedObjects = {};
 
     static MarkChangedArrayReferences: any;
 
@@ -48,7 +50,7 @@ export class PersistObjectTemplate extends ObjectTemplate {
     static __dictionary__: {[key: string]: PersistentConstructor};
 
     static _id: any;
-    static deletedObjects: any;
+    static deletedObjects = {};
     static __transient__: boolean;
     static objectMap: boolean;
     static __changeTracking__: boolean;
@@ -63,6 +65,13 @@ export class PersistObjectTemplate extends ObjectTemplate {
         this.baseClassForPersist = baseClassForPersist;
         return this;
     }
+
+    // static create(name: any, properties: any) {
+    //     const template = super.create(name, properties);
+    //     Object.assign(template.prototype, Persistent);
+    //     debugger;
+    //     return template;
+    // }
 
     /**
      * 
@@ -127,6 +136,11 @@ export class PersistObjectTemplate extends ObjectTemplate {
      */
     static _injectIntoTemplate(template) {
         this._prepareSchema(template);
+
+        if (this.jsPath) {
+            Injections._injectTemplateFunctions(template);
+            Injections._injectObjectFunctions(template);
+        }
 
         // Add persistors to foreign key references
         if (template.defineProperties && typeof (template._injectProperties) == 'function')

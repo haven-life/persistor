@@ -328,6 +328,7 @@ describe('Banking from pgsql Example', function () {
                 });
                 PersistObjectTemplate.setDB(knex, PersistObjectTemplate.DB_Knex,  'pg');
                 PersistObjectTemplate.setSchema(schema);
+                PersistObjectTemplate.jsPath = true;
                 PersistObjectTemplate.performInjections(); // Normally done by getTemplates
             }).catch(function(e) {throw e;});
     });
@@ -388,94 +389,94 @@ describe('Banking from pgsql Example', function () {
     //     });
     // });
 
-    // it ('can create the data', function () {
-    //     // Setup customers and addresses
-    //     sam = new Customer('Sam', 'M', 'Elsamman');
-    //     karen = new Customer('Karen', 'M', 'Burke');
-    //     ashling = new Customer('Ashling', '', 'Burke');
+    it ('can create the data', function () {
+        // Setup customers and addresses
+        sam = new Customer('Sam', 'M', 'Elsamman');
+        karen = new Customer('Karen', 'M', 'Burke');
+        ashling = new Customer('Ashling', '', 'Burke');
 
 
-    //     // Setup referrers
-    //     sam.referrers = [ashling, karen];
-    //     ashling.referredBy = sam;
-    //     karen.referredBy = sam;
-    //     sam.local1 = 'foo';
-    //     sam.local2 = 'bar';
+        // Setup referrers
+        sam.referrers = [ashling, karen];
+        ashling.referredBy = sam;
+        karen.referredBy = sam;
+        sam.local1 = 'foo';
+        sam.local2 = 'bar';
 
-    //     // Setup addresses
-    //     sam.addAddress('primary', ['500 East 83', 'Apt 1E'], 'New York', 'NY', '10028');
-    //     sam.addAddress('secondary', ['38 Haggerty Hill Rd', ''], 'Rhinebeck', 'NY', '12572');
+        // Setup addresses
+        sam.addAddress('primary', ['500 East 83', 'Apt 1E'], 'New York', 'NY', '10028');
+        sam.addAddress('secondary', ['38 Haggerty Hill Rd', ''], 'Rhinebeck', 'NY', '12572');
 
-    //     sam.secondaryAddresses[0].addReturnedMail(new Date());
-    //     sam.secondaryAddresses[0].addReturnedMail(new Date());
+        sam.secondaryAddresses[0].addReturnedMail(new Date());
+        sam.secondaryAddresses[0].addReturnedMail(new Date());
 
-    //     karen.addAddress('primary', ['500 East 83d', 'Apt 1E'], 'New York', 'NY', '10028');
-    //     karen.addAddress('secondary', ['38 Haggerty Hill Rd', ''], 'Rhinebeck', 'NY', '12572');
+        karen.addAddress('primary', ['500 East 83d', 'Apt 1E'], 'New York', 'NY', '10028');
+        karen.addAddress('secondary', ['38 Haggerty Hill Rd', ''], 'Rhinebeck', 'NY', '12572');
 
-    //     karen.primaryAddresses[0].addReturnedMail(new Date());
+        karen.primaryAddresses[0].addReturnedMail(new Date());
 
-    //     ashling.addAddress('primary', ['End of the Road', ''], 'Lexington', 'KY', '34421');
+        ashling.addAddress('primary', ['End of the Road', ''], 'Lexington', 'KY', '34421');
 
-    //     // Setup accounts
-    //     samsAccount = new Account(123412341234123, ['Sam Elsamman'], sam, sam.primaryAddresses[0]);
-    //     jointAccount = new Account(.123412341234123, ['Sam Elsamman', 'Karen Burke', 'Ashling Burke'], sam, karen.primaryAddresses[0]);
-    //     jointAccount.addCustomer(karen, 'joint');
-    //     jointAccount.addCustomer(ashling, 'joint');
+        // Setup accounts
+        samsAccount = new Account(123412341234123, ['Sam Elsamman'], sam, sam.primaryAddresses[0]);
+        jointAccount = new Account(.123412341234123, ['Sam Elsamman', 'Karen Burke', 'Ashling Burke'], sam, karen.primaryAddresses[0]);
+        jointAccount.addCustomer(karen, 'joint');
+        jointAccount.addCustomer(ashling, 'joint');
 
-    //     samsAccount.credit(100);                        // Sam has 100
-    //     samsAccount.debit(50);                          // Sam has 50
-    //     jointAccount.credit(200);                       // Joint has 200
-    //     jointAccount.transferTo(100, samsAccount);      // Joint has 100, Sam has 150
-    //     jointAccount.transferFrom(50, samsAccount);     // Joint has 150, Sam has 100
-    //     jointAccount.debit(25);                         // Joint has 125
-    // });
+        samsAccount.credit(100);                        // Sam has 100
+        samsAccount.debit(50);                          // Sam has 50
+        jointAccount.credit(200);                       // Joint has 200
+        jointAccount.transferTo(100, samsAccount);      // Joint has 100, Sam has 150
+        jointAccount.transferFrom(50, samsAccount);     // Joint has 150, Sam has 100
+        jointAccount.debit(25);                         // Joint has 125
+    });
 
-    // it('both accounts have the right balance', function () {
-    //     expect(samsAccount.getBalance()).to.equal(100);
-    //     expect(jointAccount.getBalance()).to.equal(125);
-    // });
+    it('both accounts have the right balance', function () {
+        expect(samsAccount.getBalance()).to.equal(100);
+        expect(jointAccount.getBalance()).to.equal(125);
+    });
 
-    // it('check server side fetch property..', function () {
-    //     return samsAccount.addressFetch(0, 1).then(function(address) {
-    //         expect(util.inspect(address)).to.not.equal('');
-    //     })
-    // });
-    // it('can insert', function (done) {
-    //     PersistObjectTemplate.begin();
-    //     sam.setDirty();
-    //     ashling.setDirty();
-    //     karen.setDirty();
-    //     PersistObjectTemplate.end().then(function(result) {
-    //         expect(result).to.equal(true);
-    //         done();
-    //     }).catch(function(e) {done(e)});
-    // });
-    // it('Accounts have addresses', function (done) {
-    //     Account.getFromPersistWithQuery(null, {address: true, transactions: false, fromAccountTransactions: false}).then (function (accounts) {
-    //         expect(accounts.length).to.equal(2);
-    //         expect(accounts[0].address.__template__.__name__).to.equal('Address');
-    //         expect(accounts[0].number).to.equal(123412341234123);
-    //         expect(accounts[1].number).to.equal(.123412341234123);
-    //         expect(accounts[0].roles[0].customer.firstName).to.equal('Sam');
-    //         done();
-    //     }).catch(function(e) {
-    //         done(e)
-    //     })
-    // });
-    // it('Dummy fetchProperty call, object already contains the values', function () {
-    //     Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
-    //         accounts[0].fetchProperty('roles', null, {sort: {_id: 1}});
-    //     }).catch(function(e) {
-    //         throw e;
-    //     })
-    // });
-    // it('Dummy fetchProperty call, object already contains the values', function () {
-    //     Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
-    //         accounts[0].fetchProperty('roles', null, {sort: {_id: 0}});
-    //     }).catch(function(e) {
-    //         throw e;
-    //     })
-    // });
+    it('check server side fetch property..', function () {
+        return samsAccount.addressFetch(0, 1).then(function(address) {
+            expect(util.inspect(address)).to.not.equal('');
+        })
+    });
+    it('can insert', function (done) {
+        PersistObjectTemplate.begin();
+        sam.setDirty();
+        ashling.setDirty();
+        karen.setDirty();
+        PersistObjectTemplate.end().then(function(result) {
+            expect(result).to.equal(true);
+            done();
+        }).catch(function(e) {done(e)});
+    });
+    it('Accounts have addresses', function (done) {
+        Account.getFromPersistWithQuery(null, {address: true, transactions: false, fromAccountTransactions: false}).then (function (accounts) {
+            expect(accounts.length).to.equal(2);
+            expect(accounts[0].address.__template__.__name__).to.equal('Address');
+            expect(accounts[0].number).to.equal(123412341234123);
+            expect(accounts[1].number).to.equal(.123412341234123);
+            expect(accounts[0].roles[0].customer.firstName).to.equal('Sam');
+            done();
+        }).catch(function(e) {
+            done(e)
+        })
+    });
+    it('Dummy fetchProperty call, object already contains the values', function () {
+        Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
+            accounts[0].fetchProperty('roles', null, {sort: {_id: 1}});
+        }).catch(function(e) {
+            throw e;
+        })
+    });
+    it('Dummy fetchProperty call, object already contains the values', function () {
+        Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
+            accounts[0].fetchProperty('roles', null, {sort: {_id: 0}});
+        }).catch(function(e) {
+            throw e;
+        })
+    });
     // it('Customers have addresses', function (done) {
     //     Customer.getFromPersistWithQuery(null, {primaryAddresses: true, secondaryAddresses: true}).then (function (customers) {
     //         expect(customers[0].primaryAddresses.length + customers[0].secondaryAddresses.length +

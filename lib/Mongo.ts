@@ -1086,6 +1086,6 @@ export namespace Mongo {
 
     // deleteFromPersistWithMongoId
     export async function deleteById(persistor: typeof PersistObjectTemplate, template, id, logger) {
-        return deleteByQuery(persistor, template, { _id: new ObjectID(id.toString()) }, logger);
+        return await deleteQuery(persistor, template, { _id: new ObjectID(id.toString()) }, logger);
     }
 }

@@ -86,6 +86,7 @@ export namespace Query {
         // If at the top level we want to execute this requests and any that are appended during processing
         // Otherwise we are called from within the query results processor and this entire call is already
         // in a request so we just execute it.
+
         if (topLevel) {
             requests.push(request);
             return await resolveRecursiveRequests(requests, results)
@@ -130,11 +131,15 @@ export namespace Query {
     }
 
     export async function resolveRecursiveRequests(requests: any[], results) {
-        const segLength = requests.length;
-        await Promise.all(requests.map(async (request, _ix) => {
-            return await request();
-        }));
+                const segLength = requests.length;
+        const promises = requests.map(async (request, _ix) => {
+            const req = await request();
+            return req;
+        });
+        await Promise.all(promises);
+        
         await requests.splice(0, segLength);
+
         //@TODO: Is this really how we deal with requests?
         if (requests.length > 0) {
             return await resolveRecursiveRequests(requests, results);

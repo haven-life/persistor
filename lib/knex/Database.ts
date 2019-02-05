@@ -28,11 +28,18 @@ export namespace Database {
             select = select.leftOuterJoin(`${joinTableName} as ${join.alias}`, `${join.alias}.${join.parentKey}`, `${tableName}.${join.childKey}`);
         });
 
-        select = executeQueryOrChains(queryOrChains, select, tableName);
+        if (queryOrChains) {
+            if (typeof (queryOrChains) == 'function') {
+                queryOrChains(select);
+            }
+            else if (queryOrChains) {
+                select =  convertMongoQueryToChains(tableName, select, queryOrChains);
+            }
+        }
 
         if (options && options.sort) {
-            const ascending: string[] = [];
-            const descending = [];
+            const ascending: any = [];
+            const descending: any= [];
 
             _.each(options.sort, (value, key) => {
                 if (value > 0) {
@@ -43,17 +50,12 @@ export namespace Database {
                 }
             });
 
-            // @TODO: ask srksag about conflicting types
+            // @TODO: Fix these conflicting types
             if (ascending.length) {
-                for (const asc of ascending) {
-                    select = select.orderBy(asc);
-                }
+                select = select.orderBy(ascending);
             }
             if (descending.length) {
-                for (const desc of ascending) {
-                    select = select.orderBy(desc);
-                }
-                select = select.orderBy('DESC');
+                select = select.orderBy(descending, 'DESC');
             }
         }
 
@@ -91,8 +93,7 @@ export namespace Database {
         }
 
         return await select
-            .then(processResults)
-            .then(processError);
+            .then(processResults, processError);
 
 
         function processResults(res) {
@@ -130,7 +131,14 @@ export namespace Database {
         const tableName = UtilityFunctions.dealias(template.__table__);
         let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
-        knex = executeQueryOrChains(queryOrChains, knex, tableName);
+        if (queryOrChains) {
+            if (typeof (queryOrChains) == 'function') {
+                queryOrChains(knex);
+            }
+            else if (queryOrChains) {
+                convertMongoQueryToChains(tableName, knex, queryOrChains);
+            }
+        }
 
         const countResult = await knex.count('_id');
         return countResult[0].count * 1;
@@ -208,9 +216,15 @@ export namespace Database {
             knex.transacting(txn.knex);
         }
 
-        knex = executeQueryOrChains(queryOrChains, knex, tableName);
+            if (typeof (queryOrChains) == 'function') {
+                queryOrChains(knex);
+            }
+            else if (queryOrChains) {
+                return convertMongoQueryToChains(tableName, knex, queryOrChains);
+            }
 
-        return knex.delete();
+
+        return await knex.delete();
     }
 
     export async function deleteFromKnexByQuery(persistor: typeof PersistObjectTemplate, template, queryOrChains, txn) {
@@ -703,7 +717,6 @@ export namespace Database {
                 _changes[tableName][key] = _changes[tableName][key] || [];
                 _changes[tableName][key].push.apply(_changes[tableName][key], track[key]);
             });
-            debugger;
 
             function _diff(masterTblSchema, shadowTblSchema, opr, addMissingTable, addPredicate, diffs) {
 
@@ -1404,18 +1417,5 @@ export namespace Database {
         }
 
         return traverse(statement, query);
-    }
-
-    function executeQueryOrChains(queryOrChains, select, tableName) {
-        //  execute callback to chain on filter functions or convert mongo style filters
-        if (queryOrChains) {
-            if (typeof (queryOrChains) == 'function') {
-                queryOrChains(select);
-            }
-            else if (queryOrChains) {
-                return convertMongoQueryToChains(tableName, select, queryOrChains);
-            }
-        }
-        return select;
     }
 }

@@ -802,7 +802,7 @@ export class Persistent extends Supertype {
     * @returns
     * @memberof Persistent
     */
-   protected static _injectProperties() {
+    static _injectProperties() {
         if (this.hasOwnProperty('__propertiesInjected__'))
             return;
         const props = this.defineProperties;

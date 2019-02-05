@@ -53,14 +53,16 @@
         "compile:all": "npm run compile && npm run compile:tests",
         "prepublishOnly": "npm run compile",
         "test": "_mocha -- test/persist_banking_pgsql.js",
-        "test:debug": "mocha test/persist_banking_pgsql.js --inspect-brk=127.0.0.1:5858",
+        "test:debug": "mocha test/persist_banking_pgsql.js --inspect-brk=0.0.0.0:5858",
         "test:docker": "docker-compose up --build",
         "test:docker:debug": "docker-compose -f docker-compose-debug.yml up --build",
+        "restart:docker:debug": "docker-compose -f docker-compose-debug.yml restart && docker-compose logs -f --tail 100 persistor-test",
         "test:compiled:js": "_mocha ./test/supertype/persist_banking_pgsql.js --exit",
         "test:config": "mocha test/config --exit",
         "test:example": "mocha test/example --exit",
         "test:ts": "mocha --compilers ts:ts-node/register test/supertype/persist_banking_pgsql.ts",
-        "test:ts:debug": "mocha --inspect-brk --compilers ts:ts-node/register test/supertype/persist_banking_pgsql.ts"
+        "test:ts:debug": "mocha --inspect-brk --compilers ts:ts-node/register test/supertype/persist_banking_pgsql.ts",
+        "compile:watch": "tsc -w -p ./tsconfig.json"
     },
     "bugs": {
         "url": "http://github.com/haven-life/persistor/issues"

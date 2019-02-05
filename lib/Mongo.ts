@@ -26,13 +26,13 @@ export namespace Mongo {
                 blob = { __version__: origVer, _id: updateID };
             }
             else {
-                blob = { _id: updateID };
+                blob = {_id: updateID};
             }
-
-            return await collection.update(blob);
+            
+            return collection.update(blob, pojo, {w:1});
         }
         else {
-            return await collection.save(pojo, { w: 1 });
+            return collection.save(pojo, { w: 1 });
         }
     }
 
@@ -57,7 +57,12 @@ export namespace Mongo {
      */
     export async function persistSave(persistor, obj, promises, masterId, idMap, txn, logger?) {
         if (!obj.__template__) {
-            throw new Error('Attempt to save an non-templated Object');
+            // sometimes we get a promise here...todo figure out why. ffor now, just await it and recheck.
+            obj = await obj;
+
+            if(!obj.__template__) {
+                throw new Error('Attempt to save an non-templated Object');
+            }
         }
         if (!obj.__template__.__schema__) {
             throw new Error(`Schema entry missing for ${obj.__template__.__name__}`);
@@ -279,7 +284,7 @@ export namespace Mongo {
                                     component: 'persistor', module: 'update.persistSaveMongo',
                                     activity: 'processing'
                                 }, 'Saving ' + prop + ' as document because we updated it\'s foreign key');
-                                promises.push(persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
+                                promises.push(await persistSave(persistor, value[ix], promises, null, idMap, txn, logger));
                             }
                         }
                 }
@@ -710,6 +715,94 @@ export namespace Mongo {
         const collection = UtilityFunctions.getCollectionByTemplate(persistor, template);
 
         return await collection.count(query);
+    }
+
+    // distinctFromMongoQuery
+    export async function distinctByQuery(persistor, template, field, query) {
+        const collection = UtilityFunctions.getCollectionByTemplate(persistor, template);
+
+        return await collection._collection.distinct(field, query);
+    }
+
+    // getPOJOFromMongoId
+    export async function getPOJOById(persistor, template, id, _cascade, _isTransient, idMap) {
+        idMap = idMap || {};
+
+        const query = { _id: new ObjectID(id) };
+
+        const pojos = await persistor.getPOJOFromQuery(template, query, idMap);
+
+        if (pojos.length > 0) {
+            return pojos[0];
+        }
+        else {
+            return null;
+        }
+    }
+
+    // getFromPersistWithMongoQuery @TODO: come back to this later
+    export async function findByQuery(persistor, template, query, cascade, skip, limit, isTransient, idMap, options?, logger?) {
+        idMap = idMap || {};
+        options = options || {};
+        if (typeof (skip) != 'undefined')
+            options.skip = skip * 1;
+        if (typeof (limit) != 'undefined')
+            options.limit = limit * 1;
+        if(!template.__schema__) {
+            console.log("TEMPLATE!!", template);
+        }
+        if (template.__schema__.subDocumentOf) {
+            var subQuery = createSubDocQuery(persistor, query, template, logger);
+            const pojos: any[] = await getPOJOByQuery(persistor, template, subQuery.query, options, logger);
+
+            // var promises = [];
+            var results = [];
+            let totalPromises: Promise<any>[];
+            let index = 0;
+            const promises = pojos.map(async (pojo, ix) => {
+
+                // Populate the idMap for any references
+                if (!idMap[pojo._id.toString()]) {
+                    var topType = UtilityFunctions.getTemplateByCollection(persistor, template.__collection__);
+                    await getTemplateFromPOJO(persistor, pojo, topType, promises, { type: topType }, idMap, {}, null, null, isTransient)
+                }
+                var subPojos = getPOJOSFromPaths(persistor, template, subQuery.paths, pojo, query);
+
+                const subPromises = subPojos.map(async (subPojo, jx) => {
+                    const gotTemplate = await getTemplateFromPOJO(persistor, subPojo, template, null, null, idMap, cascade, null, null, isTransient, logger);
+                    results.push(gotTemplate);
+                });
+
+                return await Promise.all(subPromises);
+            });
+
+            return UtilityFunctions.resolveRecursivePromises(promises, results);
+        } else {
+            const pojos: any[] = await getPOJOByQuery(persistor, template, query, options, logger);
+            var results = [];
+
+            // can replace this with map;
+            const promises = pojos.map(async (pojo, index) => {
+                const obj = await getTemplateFromPOJO(persistor, pojo, template, null, null, idMap, cascade, null, null, isTransient, logger);
+                results[index] = obj;
+            });
+
+            return UtilityFunctions.resolveRecursivePromises(promises, results);
+        }
+    }
+
+    // deleteFromPersistWithMongoQuery
+    export async function deleteByQuery(persistors, template, query, logger) {
+        const objs = await findByQuery(template, query, undefined, undefined, undefined, undefined, undefined, undefined, logger);
+
+        const deleted = objs.map(async (obj) => await obj.persistDelete());
+
+        return await Promise.all(deleted);
+    };
+
+    // deleteFromPersistWithMongoId
+    export async function deleteById(persistor, template, id, logger) {
+        return deleteByQuery(persistor, template, { _id: new ObjectID(id.toString()) }, logger);
     }
 
     /**

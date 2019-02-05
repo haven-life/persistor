@@ -65,9 +65,6 @@ module.exports = function (_ObjectTemplate, _RemoteObjectTemplate, baseClassForP
 
     require('./api.js')(PersistObjectTemplate, baseClassForPersist);
     require('./util.js')(PersistObjectTemplate);
-    require('./mongo/query.js')(PersistObjectTemplate);
-    require('./mongo/update.js')(PersistObjectTemplate);
-    require('./mongo/db.js')(PersistObjectTemplate);
     require('./knex/query.js')(PersistObjectTemplate);
     require('./knex/update.js')(PersistObjectTemplate);
     require('./knex/db.js')(PersistObjectTemplate);

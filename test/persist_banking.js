@@ -531,37 +531,6 @@ describe('Banking Example', function () {
         });
     });
 
-
-
-    it('using fetch with value store functions2', function (done) {
-        done();
-        // var AccountExt = PersistObjectTemplate.create('AccountExt', {});
-        // schema.AccountExt = {documentOf: 'AccountExt'};
-        // // schema.CustomerExt = {};
-        // schema.Customer.parents = {
-        //     newProperty: {
-        //         id: 'accountext_id',
-        //         fetch: false
-        //     }
-        // };
-        // var CustomerExt = Customer.extend('CustomerExt', {
-        //     newProperty: { type:  AccountExt }
-        // });
-        // PersistObjectTemplate._verifySchema();
-        // PersistObjectTemplate._injectIntoTemplate(AccountExt);
-        // PersistObjectTemplate._injectIntoTemplate(CustomerExt);
-        // CustomerExt.getFromPersistWithId(sam._id).then (function (customer) {
-        //     customer['newProperty'] = [];
-        //     return customer.fetch({newProperty: true}).then( function ()
-        //     {
-        //         expect(customer.test).to.equal('setting values');
-        //         done();
-        //     });
-        // }).catch(function(e){
-        //     done(e)
-        // });
-    });
-
     it('has a correct joint account balance for sam', function (done) {
         Account.getFromPersistWithId(samsAccount._id, {roles: true}).then (function (account) {
             expect(account.getBalance()).to.equal(samsAccount.getBalance());
@@ -695,7 +664,7 @@ describe('Banking Example', function () {
         var withoutType = PersistObjectTemplate.create('withoutType', {
             name: {value: 'PrimaryIndex'}
         });
-        schema.Schema._verifySchema();
+        persistorSchema.Schema._verifySchema(PersistObjectTemplate);
         var pojo = {_id: '123123', _template: 'withoutype'};
         return mongo.Mongo.getTemplateFromPOJO(PersistObjectTemplate, pojo, withoutType, null, null, {});
     });
@@ -730,29 +699,12 @@ describe('Banking Example', function () {
             }).catch(function(e) {done(e)});
     });
 
-    it('getDB without setting database', async function () {
-        let result = await mongo.Mongo.persistSave(PersistObjectTemplate, {});
-        expect(result).to.throw('Attempt to save an non-templated Object');
-        var testWithOutSchema = PersistObjectTemplate.create('testWithOutSchema', {});
-        var obj = new testWithOutSchema();
-        expect(await mongo.Mongo.persistSave(PersistObjectTemplate, obj)).to.throw('Schema entry missing for testWithOutSchema');
-        var schema = {};
-        schema.testWithOutSchema = {};
-        schema.Schema.setSchema(schema);
-        schema.Schema._verifySchema();
-        expect(await mongo.Mongo.persistSave(PersistObjectTemplate, obj)).to.throw('which subDocument without necessary parent links to reach top level document');
-    });
-
-    it('Loading template from ', async function () {
-        expect(await mongo.Mongo.persistSave(PersistObjectTemplate, {})).to.throw('Attempt to save an non-templated Object');
-        var testWithOutSchema1 = PersistObjectTemplate.create('testWithOutSchema1', {});
-        var obj = new testWithOutSchema1();
-        expect(await mongo.Mongo.persistSave(PersistObjectTemplate, obj)).to.throw('Schema entry missing for testWithOutSchema');
-        var schema = {};
-        schema.testWithOutSchema1 = {};
-        schema.Schema.setSchema(schema);
-        schema.Schema._verifySchema();
-        expect(await mongo.Mongo.persistSave(PersistObjectTemplate, obj)).to.throw('which subDocument without necessary parent links to reach top level document');
+    it('should throw an error, attempt to persist a non persistable object', async function () {
+        try {
+            await mongo.Mongo.persistSave(PersistObjectTemplate, {});
+        } catch(e) {
+            expect(e.message).to.equal('Attempt to save an non-templated Object')
+        }
     });
 
 

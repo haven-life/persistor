@@ -792,17 +792,22 @@ export namespace Mongo {
     }
 
     // deleteFromPersistWithMongoQuery
-    export async function deleteByQuery(persistors, template, query, logger) {
-        const objs = await findByQuery(template, query, undefined, undefined, undefined, undefined, undefined, undefined, logger);
+    export async function deleteByQuery(persistor, template, query, logger) {
+        const objs = await findByQuery(persistor, template, query, undefined, undefined, undefined, undefined, undefined, undefined, logger);
 
         const deleted = objs.map(async (obj) => await obj.persistDelete());
 
         return await Promise.all(deleted);
-    };
+    }
 
     // deleteFromPersistWithMongoId
     export async function deleteById(persistor, template, id, logger) {
-        return deleteByQuery(persistor, template, { _id: new ObjectID(id.toString()) }, logger);
+        return deleteQuery(persistor, template, { _id: new ObjectID(id.toString()) }, logger);
+    }
+
+    export async function deleteQuery(persistor, template, query, _logger) {
+        const collection = UtilityFunctions.getCollectionByTemplate(persistor, template)
+        return await collection.remove(query, { w: 1, fsync: true });
     }
 
     /**

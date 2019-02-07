@@ -21,6 +21,7 @@ export namespace Update {
      */
     export async function persistSaveKnex(persistor: typeof PersistObjectTemplate, obj, txn, logger) {
         const usedLogger = logger || persistor.logger;
+        
         usedLogger.debug({
             component: 'persistor',
             module: 'db.persistSaveKnex',
@@ -189,10 +190,10 @@ export namespace Update {
                 values: dataSaved
             }
         });
-        
         promises.push(Database.saveKnexPojo(persistor, obj, pojo, isDocumentUpdate ? obj._id : null, txn, logger));
-
+        
         await Promise.all(promises);
+        
         return obj;
     }
 

@@ -879,6 +879,7 @@ module.exports = function (PersistObjectTemplate) {
      */
     PersistObjectTemplate._createKnexTable = function (template, collection) {
         collection = collection || template.__table__;
+        debugger;
         (function () {
             while (template.__parent__) {
                 template =  template.__parent__;

@@ -318,6 +318,7 @@ describe('Banking from pgsql Example', function () {
             .then(function () {
                 knex = require('knex')({
                     client: 'pg',
+                    debug: true,
                     connection: {
                         host: process.env.dbPath,
                         database: process.env.dbName,
@@ -443,40 +444,40 @@ describe('Banking from pgsql Example', function () {
     });
     it('can insert', function (done) {
         PersistObjectTemplate.begin();
-        sam.setDirty();
-        ashling.setDirty();
+        // sam.setDirty();
+        // ashling.setDirty();
         karen.setDirty();
         PersistObjectTemplate.end().then(function(result) {
             expect(result).to.equal(true);
             done();
         }).catch(function(e) {done(e)});
     });
-    it('Accounts have addresses', function (done) {
-        Account.getFromPersistWithQuery(null, {address: true, transactions: false, fromAccountTransactions: false}).then (function (accounts) {
-            expect(accounts.length).to.equal(2);
-            expect(accounts[0].address.__template__.__name__).to.equal('Address');
-            expect(accounts[0].number).to.equal(123412341234123);
-            expect(accounts[1].number).to.equal(.123412341234123);
-            expect(accounts[0].roles[0].customer.firstName).to.equal('Sam');
-            done();
-        }).catch(function(e) {
-            done(e)
-        })
-    });
-    it('Dummy fetchProperty call, object already contains the values', function () {
-        Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
-            accounts[0].fetchProperty('roles', null, {sort: {_id: 1}});
-        }).catch(function(e) {
-            throw e;
-        })
-    });
-    it('Dummy fetchProperty call, object already contains the values', function () {
-        Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
-            accounts[0].fetchProperty('roles', null, {sort: {_id: 0}});
-        }).catch(function(e) {
-            throw e;
-        })
-    });
+    // it('Accounts have addresses', function (done) {
+    //     Account.getFromPersistWithQuery(null, {address: true, transactions: false, fromAccountTransactions: false}).then (function (accounts) {
+    //         expect(accounts.length).to.equal(2);
+    //         expect(accounts[0].address.__template__.__name__).to.equal('Address');
+    //         expect(accounts[0].number).to.equal(123412341234123);
+    //         expect(accounts[1].number).to.equal(.123412341234123);
+    //         expect(accounts[0].roles[0].customer.firstName).to.equal('Sam');
+    //         done();
+    //     }).catch(function(e) {
+    //         done(e)
+    //     })
+    // });
+    // it('Dummy fetchProperty call, object already contains the values', function () {
+    //     Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
+    //         accounts[0].fetchProperty('roles', null, {sort: {_id: 1}});
+    //     }).catch(function(e) {
+    //         throw e;
+    //     })
+    // });
+    // it('Dummy fetchProperty call, object already contains the values', function () {
+    //     Account.getFromPersistWithQuery(null, {address: true}).then (function (accounts) {
+    //         accounts[0].fetchProperty('roles', null, {sort: {_id: 0}});
+    //     }).catch(function(e) {
+    //         throw e;
+    //     })
+    // });
     // it('Customers have addresses', function (done) {
     //     Customer.getFromPersistWithQuery(null, {primaryAddresses: true, secondaryAddresses: true}).then (function (customers) {
     //         expect(customers[0].primaryAddresses.length + customers[0].secondaryAddresses.length +

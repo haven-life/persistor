@@ -312,11 +312,15 @@ export namespace Database {
         if (txn && txn.knex) {
             knex.transacting(txn.knex)
         }
+
+        debugger;
+
         if (updateID) {
             const countUpdated = await knex.where('__version__', '=', origVer).andWhere('_id', '=', updateID).update(pojo);
             checkUpdateResults(countUpdated)
             logSuccess()
         } else {
+            console.log(pojo);
             await knex.insert(pojo);
             logSuccess();
         }
@@ -405,7 +409,8 @@ export namespace Database {
                     }
                 }
 
-                return await createKnexTable(persistor, template, aliasedTableName);
+                // return PersistObjectTemplate._createKnexTable(template, aliasedTableName);
+                return await _createKnexTable(persistor, template, aliasedTableName);
             }
 
             await discoverColumns(tableName);
@@ -1003,11 +1008,14 @@ export namespace Database {
                 try {
                     await processPreSave();
                     await processSaves();
-                    await processDeletes();
-                    await processDeleteQueries(persistor);
-                    await processTouches();
-                    await processPostSave();
-                    await processCommit();
+                    // await processDeletes();
+                    
+                    // await processDeleteQueries(persistor);
+                    
+                    // await processTouches();
+                    
+                    // await processPostSave();
+                    // await processCommit();
                 }
                 catch (err) {
                     await rollback(err);
@@ -1022,7 +1030,10 @@ export namespace Database {
                 // Walk through the dirty objects
                 async function processSaves() {
                     const dirtyArray = _.toArray(dirtyObjects);
-                    return await process(dirtyArray, callSave, generateChangesAction)
+                    const results = await process(dirtyArray, callSave, generateChangesAction)
+                    
+                    return results;
+
 
                     function generateChangesAction(obj) {
                         if (obj.__version__ === 1) {
@@ -1033,9 +1044,10 @@ export namespace Database {
                         }
                     }
 
-                    async function callSave(obj) {
+                    async function callSave(obj: Persistent) {
                         if (obj.__template__ && obj.__template__.__schema__) {
-                            return await obj.persistSave(persistorTransaction, logger);
+                            const saved = await obj.persistSave(persistorTransaction, logger);
+                            return saved;
                         }
                         else {
                             return await true;
@@ -1044,6 +1056,7 @@ export namespace Database {
                 }
 
                 async function processDeletes() {
+                    
                     const deletedArray = _.toArray(deletedObjects);
                     return await process(deletedArray, callDelete, generateChangesAction)
 
@@ -1053,7 +1066,7 @@ export namespace Database {
 
                     async function callDelete(obj) {
                         if (obj.__template__ && obj.__template__.__schema__) {
-                            return await obj.perssitDelete(persistorTransaction, logger);
+                            return await obj.persistDelete(persistorTransaction, logger);
                         }
                         else {
                             return true;
@@ -1064,6 +1077,7 @@ export namespace Database {
                 async function process(arrayObjects: any[], callBack: (obj) => Promise<any>, generateChangesAction: (obj) => string) {
                     await Promise.all(arrayObjects.map(async (obj: Persistent) => {
                         delete arrayObjects[obj.__id__]; // Once scheduled for update remove it.
+                        
                         await callBack(obj);
                         return await generateChanges(obj, generateChangesAction)
                     }));

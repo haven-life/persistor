@@ -12,7 +12,7 @@
       "esnext.asynciterable"
     ],
     "noImplicitAny": false,
-    "sourceMap": false,
+    "sourceMap": true,
     "typeRoots": [
       "./node_modules/@types"
     ],

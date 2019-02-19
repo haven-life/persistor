@@ -187,7 +187,7 @@ export namespace UtilityFunctions {
                 const props = obj.__template__.getProperties();
                 _.map(props, (defineProperty: any, prop) => {
 
-                    const idMapEntry = `${obj.__id__}_${prop}`;
+                    const idMapEntry = `${obj.__id__}-${prop}`;
 
                     if (defineProperty.type == Array && defineProperty.of && defineProperty.of.isObjectTemplate) {
 

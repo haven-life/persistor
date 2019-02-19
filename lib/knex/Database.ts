@@ -235,8 +235,8 @@ export namespace Database {
 
     export async function knexPruneOrphans(persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger?) {
         const template = obj.__template__;
-
-        const tableName = UtilityFunctions.dealias(template.__table__);
+        const defineProperty = template.getProperties()[property];
+        const tableName = UtilityFunctions.dealias(defineProperty.of.__table__);
         let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
         if (txn && txn.knex) {
@@ -262,7 +262,7 @@ export namespace Database {
             });
         }
 
-        return;
+        return knex;
     }
 
     /**

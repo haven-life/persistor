@@ -111,7 +111,7 @@ export class Persistent extends Supertype {
             {
                 component: 'persistor',
                 module: 'api',
-                activity: 'getFromPersistWithQuery',
+                activity: 'persistorCountByQuery',
                 data:
                 {
                     template: this.__name__
@@ -472,7 +472,7 @@ export class Persistent extends Supertype {
                     template: this.__name__
                 }
             });
-
+        
         try {
             if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
                 return await Mongo.findByQuery(PersistObjectTemplate, this, query, cascade, start, limit, isTransient, idMap, options, logger);

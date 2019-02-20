@@ -44,6 +44,7 @@ export namespace Injections {
         template.prototype.fetch = Persistent.prototype.fetch;
         template.prototype.persistorFetchReferences  = Persistent.prototype.persistorFetchReferences;
         template.prototype.persistorRefresh = Persistent.prototype.persistorRefresh;
+        template.prototype.refresh = Persistent.prototype.refresh;
         template.prototype.persistorSave = Persistent.prototype.persistorSave;
         template.prototype.persistorDelete = Persistent.prototype.persistorDelete;
 

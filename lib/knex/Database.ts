@@ -9,7 +9,7 @@ export namespace Database {
 
     // TODO NICK why do we need this to be here?
     const processedList = [];
-    export async function getPOJOsFromKnexQuery(persistor: typeof PersistObjectTemplate, template, joins, queryOrChains, options, map, customLogger, projection?) {
+    export async function getPOJOsFromKnexQuery(persistor: typeof PersistObjectTemplate, template, joins, queryOrChains, options, map, customLogger = persistor.logger, projection?) {
 
         const logger = customLogger || persistor.logger;
         const tableName: string = UtilityFunctions.dealias(template.__table__);
@@ -33,13 +33,13 @@ export namespace Database {
                 queryOrChains(select);
             }
             else if (queryOrChains) {
-                select =  convertMongoQueryToChains(tableName, select, queryOrChains);
+                select = convertMongoQueryToChains(tableName, select, queryOrChains);
             }
         }
 
         if (options && options.sort) {
             const ascending: any = [];
-            const descending: any= [];
+            const descending: any = [];
 
             _.each(options.sort, (value, key) => {
                 if (value > 0) {
@@ -82,10 +82,11 @@ export namespace Database {
 
         if (map && map[selectString]) {
             // @TODO: what's going on here
-            return map[selectString].push(await Promise.resolve());
-            // return new Promise(function (resolve) {
-            //     map[selectString].push(resolve);
-            // });
+            debugger;
+            // return map[selectString].push(await Promise.resolve());
+            return new Promise(function (resolve) {
+                map[selectString].push(resolve);
+            });
         }
 
         if (map) {
@@ -216,12 +217,12 @@ export namespace Database {
             knex.transacting(txn.knex);
         }
 
-            if (typeof (queryOrChains) == 'function') {
-                queryOrChains(knex);
-            }
-            else if (queryOrChains) {
-                return convertMongoQueryToChains(tableName, knex, queryOrChains);
-            }
+        if (typeof (queryOrChains) == 'function') {
+            queryOrChains(knex);
+        }
+        else if (queryOrChains) {
+            return convertMongoQueryToChains(tableName, knex, queryOrChains);
+        }
 
 
         return await knex.delete();
@@ -233,7 +234,7 @@ export namespace Database {
         txn.deleteQueries = deleteQueries;
     }
 
-    export async function knexPruneOrphans(persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger?) {
+    export async function knexPruneOrphans(persistor: typeof PersistObjectTemplate, obj, property, txn, filterKey, filterValue, logger = persistor.logger) {
         const template = obj.__template__;
         const defineProperty = template.getProperties()[property];
         const tableName = UtilityFunctions.dealias(defineProperty.of.__table__);
@@ -274,7 +275,7 @@ export namespace Database {
      * @param {object} _logger objecttemplate logger
      * @returns {*}
      */
-    export async function deleteFromKnexId(persistor: typeof PersistObjectTemplate, template, id, txn, _logger) {
+    export async function deleteFromKnexId(persistor: typeof PersistObjectTemplate, template, id, txn, _logger = persistor.logger) {
         const tableName = UtilityFunctions.dealias(template.__table__);
         let knex = UtilityFunctions.getKnexConnection(persistor, template)(tableName);
 
@@ -294,15 +295,15 @@ export namespace Database {
      * @param {object} logger objecttemplate logger
      * @returns {*}
      */
-    export async function saveKnexPojo(persistor: typeof PersistObjectTemplate, obj, pojo, updateID, txn, logger) {
+    export async function saveKnexPojo(persistor: typeof PersistObjectTemplate, obj, pojo, updateID, txn, logger = persistor.logger) {
         const origVer = obj.__version__;
-
+        const usedLogger = logger || persistor.logger;
         const tableName = UtilityFunctions.dealias(obj.__template__.__table__);
         const knex = UtilityFunctions.getKnexConnection(persistor, obj.__template__)(tableName);
 
         obj.__version__ = obj.__version__ ? obj.__version__ * 1 + 1 : 1;
         pojo.__version__ = obj.__version__;
-        logger.debug({
+        usedLogger.debug({
             component: 'persistor', module: 'db.saveKnexPojo', activity: 'pre',
             data: {
                 txn: (txn ? txn.id + ' ' : '-#- '), type: (updateID ? 'updating ' : 'insert '),
@@ -312,8 +313,6 @@ export namespace Database {
         if (txn && txn.knex) {
             knex.transacting(txn.knex)
         }
-
-        debugger;
 
         if (updateID) {
             const countUpdated = await knex.where('__version__', '=', origVer).andWhere('_id', '=', updateID).update(pojo);
@@ -328,7 +327,7 @@ export namespace Database {
 
         function checkUpdateResults(countUpdated) {
             if (countUpdated < 1) {
-                logger.debug({
+                usedLogger.debug({
                     component: 'persistor', module: 'db.saveKnexPojo', activity: 'updateConflict',
                     data: { txn: (txn ? txn.id : '-#-'), id: obj.__id__, __version__: origVer }
                 });
@@ -343,7 +342,7 @@ export namespace Database {
         }
 
         function logSuccess() {
-            logger.debug({
+            usedLogger.debug({
                 component: 'persistor', module: 'db.saveKnexPojo', activity: 'post',
                 data: { template: obj.__template__.__name__, table: obj.__template__.__table__, __version__: obj.__version__ }
             });
@@ -876,7 +875,7 @@ export namespace Database {
         return map;
     }
 
-    export async function persistTouchKnex(persistor: typeof PersistObjectTemplate, obj: Persistent, txn, logger) {
+    export async function persistTouchKnex(persistor: typeof PersistObjectTemplate, obj: Persistent, txn, logger = persistor.logger) {
         logger.debug({
             component: 'persistor', module: 'db.persistTouchKnex', activity: 'pre',
             data: { template: obj.__template__.__name__, table: obj.__template__.__table__ }
@@ -990,7 +989,7 @@ export namespace Database {
         }
     }
 
-    export async function _commitKnex(persistor: typeof PersistObjectTemplate, persistorTransaction, logger, notifyChanges) {
+    export async function _commitKnex(persistor: typeof PersistObjectTemplate, persistorTransaction, logger = persistor.logger, notifyChanges) {
         logger.debug({ component: 'persistor', module: 'api', activity: 'commit' }, 'end of transaction ');
         const knex = (_.findWhere(persistor._db as any, { type: PersistObjectTemplate.DB_Knex }) as any).connection;
         const dirtyObjects = persistorTransaction.dirtyObjects;
@@ -1005,17 +1004,18 @@ export namespace Database {
         try {
             await knex.transaction(async function (knexTransaction) {
                 persistorTransaction.knex = knexTransaction;
+
                 try {
                     await processPreSave();
-                    await processSaves();
-                    // await processDeletes();
-                    
-                    // await processDeleteQueries(persistor);
-                    
-                    // await processTouches();
-                    
-                    // await processPostSave();
-                    // await processCommit();
+                    await processSaves.call(this);
+                    await processDeletes.call(this);
+
+                    await processDeleteQueries(persistor);
+
+                    await processTouches();
+
+                    await processPostSave();
+                    await processCommit();
                 }
                 catch (err) {
                     await rollback(err);
@@ -1029,61 +1029,36 @@ export namespace Database {
 
                 // Walk through the dirty objects
                 async function processSaves() {
-                    const dirtyArray = _.toArray(dirtyObjects);
-                    const results = await process(dirtyArray, callSave, generateChangesAction)
-                    
-                    return results;
-
-
-                    function generateChangesAction(obj) {
-                        if (obj.__version__ === 1) {
-                            return 'insert';
-                        }
-                        else {
-                            return 'update';
-                        }
-                    }
-
-                    async function callSave(obj: Persistent) {
-                        if (obj.__template__ && obj.__template__.__schema__) {
-                            const saved = await obj.persistSave(persistorTransaction, logger);
-                            return saved;
-                        }
-                        else {
-                            return await true;
-                        }
-                    }
-                }
-
-                async function processDeletes() {
-                    
-                    const deletedArray = _.toArray(deletedObjects);
-                    return await process(deletedArray, callDelete, generateChangesAction)
-
-                    function generateChangesAction(obj) {
-                        return 'delete';
-                    }
-
-                    async function callDelete(obj) {
-                        if (obj.__template__ && obj.__template__.__schema__) {
-                            return await obj.persistDelete(persistorTransaction, logger);
-                        }
-                        else {
-                            return true;
-                        }
-                    }
-                }
-
-                async function process(arrayObjects: any[], callBack: (obj) => Promise<any>, generateChangesAction: (obj) => string) {
-                    await Promise.all(arrayObjects.map(async (obj: Persistent) => {
-                        delete arrayObjects[obj.__id__]; // Once scheduled for update remove it.
-                        
-                        await callBack(obj);
-                        return await generateChanges(obj, generateChangesAction)
+                    await Promise.all(_.toArray(dirtyObjects).map(async (obj: any) => {
+                        delete dirtyObjects[obj.__id__];  // Once scheduled for update remove it.
+                        return callSave(obj).then(generateChanges.bind(this, obj, obj.__version__ === 1 ? 'insert' : 'update'));
                     }));
 
-                    if (arrayObjects.length > 0) {
-                        return await process(arrayObjects, callBack, generateChangesAction);
+                    if (_.toArray(dirtyObjects).length > 0) {
+                        return processSaves.call(this);
+                    }
+
+                    function callSave(obj) {
+                        return (obj.__template__ && obj.__template__.__schema__
+                            ? obj.persistSave(persistorTransaction, logger)
+                            : Promise.resolve(true));
+                    }
+                }
+
+
+                async function processDeletes() {
+                    await Promise.all(_.toArray(deletedObjects).map(async (obj: any) => {
+                        delete deletedObjects[obj.__id__];  // Once scheduled for update remove it.
+                        return callDelete(obj).then(generateChanges.bind(this, obj, 'delete'));
+                    }));
+                    if (_.toArray(deletedObjects).length > 0) {
+                        return processDeletes.call(this);
+                    }
+
+                    function callDelete(obj) {
+                        return (obj.__template__ && obj.__template__.__schema__
+                            ? obj.persistDelete(persistorTransaction, logger)
+                            : Promise.resolve(true))
                     }
                 }
 

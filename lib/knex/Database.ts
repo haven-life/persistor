@@ -1007,13 +1007,10 @@ export namespace Database {
 
                 try {
                     await processPreSave();
-                    await processSaves.call(this);
-                    await processDeletes.call(this);
-
+                    await processSaves();
+                    await processDeletes();
                     await processDeleteQueries(persistor);
-
                     await processTouches();
-
                     await processPostSave();
                     await processCommit();
                 }
@@ -1028,14 +1025,16 @@ export namespace Database {
                 }
 
                 // Walk through the dirty objects
+                // @TODO: Refactor common/redundant functionality in processDeletes and processSaves
                 async function processSaves() {
                     await Promise.all(_.toArray(dirtyObjects).map(async (obj: any) => {
                         delete dirtyObjects[obj.__id__];  // Once scheduled for update remove it.
-                        return callSave(obj).then(generateChanges.bind(this, obj, obj.__version__ === 1 ? 'insert' : 'update'));
+                        await callSave(obj);
+                        return generateChanges(obj, obj.__version__ === 1 ? 'insert' : 'update');
                     }));
 
                     if (_.toArray(dirtyObjects).length > 0) {
-                        return processSaves.call(this);
+                        return processSaves();
                     }
 
                     function callSave(obj) {
@@ -1049,10 +1048,12 @@ export namespace Database {
                 async function processDeletes() {
                     await Promise.all(_.toArray(deletedObjects).map(async (obj: any) => {
                         delete deletedObjects[obj.__id__];  // Once scheduled for update remove it.
-                        return callDelete(obj).then(generateChanges.bind(this, obj, 'delete'));
+                        await callDelete(obj);
+                        return generateChanges(obj, 'delete');
                     }));
+
                     if (_.toArray(deletedObjects).length > 0) {
-                        return processDeletes.call(this);
+                        return processDeletes();
                     }
 
                     function callDelete(obj) {

@@ -102,7 +102,7 @@ export namespace Query {
 
         async function resolvePromises() {
             await Promise.all(promises)
-            return await results;
+            return results;
         }
 
         async function getTemplatesFromPOJOS(pojos) {
@@ -118,7 +118,6 @@ export namespace Query {
                 sortMap[pojo[`${UtilityFunctions.dealias(template.__table__)}____id`]] = ix;
                 const obj = await getTemplateFromKnexPOJO(persistor, pojo, template, requests, idMap, cascade, isTransient, null, establishedObject, null, `${UtilityFunctions.dealias(template.__table__)}___`, joins, isRefresh, logger, enableChangeTracking, projection);
                 results[sortMap[obj._id]] = obj;
-                promises.push(Promise.resolve(obj));
             }));
         }
 
@@ -131,7 +130,7 @@ export namespace Query {
     }
 
     export async function resolveRecursiveRequests(requests: any[], results) {
-                const segLength = requests.length;
+        const segLength = requests.length;
         const promises = requests.map(async (request, _ix) => {
             const req = await request();
             return req;
@@ -460,7 +459,7 @@ export namespace Query {
 
             const join = _.find(joins, (j: any) => { return j.prop == prop });
 
-            requests.push(generateQueryRequest());
+            requests.push(generateQueryRequest);
 
             async function generateQueryRequest() {
                 if (join) {

@@ -87,7 +87,7 @@ export class Persistent extends Supertype {
                 return await Mongo.findByQuery(persistObjectTemplate, this, query, options.fetch, options.start, options.limit, options.transient, options.order, options.order, usedLogger);
             }
             else {
-                return await persistObjectTemplate.getFromPersistWithKnexQuery(null, this, query, options.fetch, options.start, options.limit, options.transient, null, options.order, undefined, undefined, usedLogger, options.enableChangeTracking, options.projection);
+                return await Knex.Query.getFromPersistWithKnexQuery(persistObjectTemplate, null, this, query, options.fetch, options.start, options.limit, options.transient, null, options.order, undefined, undefined, usedLogger, options.enableChangeTracking, options.projection);
             }
         } catch (err) {
             // This used to be options.logger || PersistObjectTemplate.logger
@@ -143,6 +143,7 @@ export class Persistent extends Supertype {
         options = options || {};
 
         var persistObjectTemplate = options.session || PersistObjectTemplate;
+        // console.log(PersistObjectTemplate);
         const usedLogger = options.logger ? options.logger : persistObjectTemplate.logger;
 
         usedLogger.debug(
@@ -157,15 +158,12 @@ export class Persistent extends Supertype {
                 }
             });
 
-        const dbAlias = persistObjectTemplate.getDBAlias(this.__collection__);
-        const dbType = persistObjectTemplate.getDB(dbAlias).type;
-
         try {
-            if (dbType == persistObjectTemplate.DB_Mongo) {
-                return await persistObjectTemplate.getFromPersistWithMongoId(this, id, options.fetch, options.transient, null, usedLogger); //@TODO: talk this over with srksag changed this from options.logger to usedLogger
+            if (UtilityFunctions.isDBMongo(PersistObjectTemplate, this.__collection__)) {
+                return await Mongo.findById(persistObjectTemplate, this, id, options.fetch, options.transient, null, usedLogger); //@TODO: talk this over with srksag changed this from options.logger to usedLogger
             }
             else {
-                return await persistObjectTemplate.getFromPersistWithKnexId(this, id, options.fetch, options.transient, null, null, usedLogger, options.enableChangeTracking, options.projection); //@TODO: talk this over with srksag changed this from options.logger to usedLogger
+                return await Knex.Query.getFromPersistWithKnexId(persistObjectTemplate, this, id, options.fetch, options.transient, null, null, usedLogger, options.enableChangeTracking, options.projection); //@TODO: talk this over with srksag changed this from options.logger to usedLogger
             }
         } catch (err) {
             return UtilityFunctions.logExceptionAndRethrow(err, usedLogger, this.__name__, id, 'persistorFetchById');

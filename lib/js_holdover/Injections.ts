@@ -46,6 +46,7 @@ export namespace Injections {
         template.prototype.persistorRefresh = Persistent.prototype.persistorRefresh;
         template.prototype.refresh = Persistent.prototype.refresh;
         template.prototype.persistorSave = Persistent.prototype.persistorSave;
+        template.prototype.persist = Persistent.prototype.persist;
         template.prototype.persistorDelete = Persistent.prototype.persistorDelete;
 
         if (template.defineProperties && typeof(template._injectProperties) == 'function') {

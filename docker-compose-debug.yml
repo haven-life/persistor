@@ -22,7 +22,7 @@ services:
     build:
       context: .
     volumes:
-      - './:/app'
+      - ./:/app
     ports:
       - '9200:5858'
     depends_on:

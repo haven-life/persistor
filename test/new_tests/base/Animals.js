@@ -1,7 +1,8 @@
 var expect = require('chai').expect;
 var ObjectTemplate = require('supertype').default;
-var PersistObjectTemplate = require('../dist/index.js').default(ObjectTemplate);
-
+var PersistObjectTemplate = require('../../../dist/index.js').default(ObjectTemplate);
+PersistObjectTemplate.jsPath = true;
+const UtilityFunctions = require('../../../dist/lib/UtilityFunctions').UtilityFunctions;
 /* Teacher Student Example */
 
 var Animal = ObjectTemplate.create('Animal', {
@@ -91,7 +92,7 @@ describe('Freeze Dried Arks', function () {
     });
 
     it ('check the callback', function() {
-        var response = PersistObjectTemplate.createTransientObject(function() {
+        var response = UtilityFunctions.createTransientObject(PersistObjectTemplate, function() {
             return 'checkdata';
         });
         expect(response).to.equal('checkdata');
@@ -99,13 +100,13 @@ describe('Freeze Dried Arks', function () {
 
     it ('if the current transient state is false, createTransientObject should retain the false state', function() {
         PersistObjectTemplate.__transient__ = false;
-        PersistObjectTemplate.createTransientObject();
+        UtilityFunctions.createTransientObject(PersistObjectTemplate);
         expect(PersistObjectTemplate.__transient__).to.equal(false);
     });
 
     it ('if the current transient state is true, createTransientObject should retain the true state', function() {
         PersistObjectTemplate.__transient__ = true;
-        PersistObjectTemplate.createTransientObject();
+        UtilityFunctions.createTransientObject(PersistObjectTemplate);
         expect(PersistObjectTemplate.__transient__).to.equal(true);
     })
 

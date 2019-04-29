@@ -48,8 +48,8 @@ describe('persistor transaction checks', function () {
     });
     beforeEach('arrange', function () {
         ObjectTemplate = require('supertype').default;
-        PersistObjectTemplate = require('../dist/index.js').default(ObjectTemplate);
-
+        PersistObjectTemplate = require('../../../../dist/index.js').default(ObjectTemplate);
+        PersistObjectTemplate.jsPath = true;
         schema.Employee = {};
         schema.Address = {};
         schema.Phone = {};

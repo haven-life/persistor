@@ -35,7 +35,7 @@ describe('persistor transaction checks', function () {
     });
     beforeEach('arrange', function () {
         ObjectTemplate = require('supertype').default;
-        PersistObjectTemplate = require('../dist/index.js').default(ObjectTemplate);
+        PersistObjectTemplate = require('../../dist/index.js').default(ObjectTemplate);
         schema.Person = {};
         schema.Person.table =  'tx_person';
         schema.Person.documentOf =  'tx_person';
@@ -116,6 +116,8 @@ describe('persistor transaction checks', function () {
     });
 
     afterEach('remove tables and after each test', function() {
+        PersistObjectTemplate.setSchema({});
+        PersistObjectTemplate.schemaVerified = false;
         return Promise.all([
             knex.schema.dropTableIfExists('tx_person'),
             knex.schema.dropTableIfExists(schemaTable)]);

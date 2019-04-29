@@ -15,7 +15,7 @@ var schema = {};
 var schemaTable = 'index_schema_history';
 var Phone, Address, Employee, empId, addressId, phoneId, Role;
 var PersistObjectTemplate, ObjectTemplate;
-
+var SchemaValidator;
 describe('persistor transaction checks', function () {
     before('drop schema table once per test suit', function() {
         knex = knexInit({
@@ -41,12 +41,11 @@ describe('persistor transaction checks', function () {
                 }),
             knex.schema.dropTableIfExists(schemaTable)]);
     })
-    after('closes the database', function () {
-        return knex.destroy();
-    });
-    beforeEach('arrange', function () {
+    before('arrange', function () {
         ObjectTemplate = require('supertype').default;
         PersistObjectTemplate = require('../dist/index.js').default(ObjectTemplate);
+        var Knex = require('../dist/lib/Knex.js').Knex;
+        SchemaValidator = require('../dist/lib/SchemaValidator.js').SchemaValidator;
 
         schema.Employee = {};
         schema.Address = {};
@@ -128,6 +127,7 @@ describe('persistor transaction checks', function () {
         (function () {
             PersistObjectTemplate.setDB(knex, PersistObjectTemplate.DB_Knex);
             PersistObjectTemplate.setSchema(schema);
+            PersistObjectTemplate.jsPath = true;
             PersistObjectTemplate.performInjections();
 
         })();
@@ -144,7 +144,7 @@ describe('persistor transaction checks', function () {
 
 
             function syncTable(template) {
-                return PersistObjectTemplate.synchronizeKnexTableFromTemplate(template);
+                return Knex.Database.synchronizeKnexTableFromTemplate(PersistObjectTemplate, template);
             }
 
             function addConstraint() {
@@ -165,7 +165,7 @@ describe('persistor transaction checks', function () {
         }
     });
 
-    afterEach('remove tables and after each test', function() {
+    after('remove tables and after each test', function() {
         return Promise.all([
             knex.schema.dropTableIfExists('tx_employee')
                 .then(function () {
@@ -178,6 +178,9 @@ describe('persistor transaction checks', function () {
                     return knex.schema.dropTableIfExists('tx_role')
                 }),
             knex.schema.dropTableIfExists(schemaTable)]);
+    });
+    after('closes the database', function () {
+        return knex.destroy();
     });
 
     it('persistorFetchById without fetch spec should not return the records', function () {
@@ -244,7 +247,7 @@ describe('persistor transaction checks', function () {
                 roles: true
             }
         }).then(function () {
-            expect(Object.keys(PersistObjectTemplate._validFetchSpecs.Employee).length).is.equal(1);
+            expect(Object.keys(SchemaValidator.getValidateFetchSpecsRefByTemplate('Employee')).length).is.equal(1);
         })
     });
 
@@ -270,7 +273,7 @@ describe('persistor transaction checks', function () {
         .then(function(employee) {
             expect(PersistObjectTemplate._validFetchSpecs).is.not.equal(null);
             return employee.fetchReferences({fetch: { homeAddress: {fetch: {phone: true}}, roles: true}}).then(function() {
-                expect(Object.keys(PersistObjectTemplate._validFetchSpecs.Employee).length).is.equal(2);
+                expect(Object.keys(SchemaValidator.getValidateFetchSpecsRefByTemplate('Employee')).length).is.equal(2);
             });
         });
     });
@@ -280,7 +283,7 @@ describe('persistor transaction checks', function () {
             .then(function() {
                 expect(PersistObjectTemplate._validFetchSpecs).is.not.equal(null);
                 return Employee.persistorFetchById(empId, {fetch: {homeAddress: false}}).then(function() {
-                    expect(Object.keys(PersistObjectTemplate._validFetchSpecs.Employee).length).is.equal(1);
+                    expect(Object.keys(SchemaValidator.getValidateFetchSpecsRefByTemplate('Employee')).length).is.equal(1);
                 });
             });
     });

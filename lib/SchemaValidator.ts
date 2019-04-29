@@ -6,7 +6,18 @@ import { Persistent } from './Persistent';
 // _validateParams from util.ts
 export namespace SchemaValidator {
 
-    let validateFetchSpecsRef;
+    let validateFetchSpecsRef: {[key: string]: any}; 
+
+    /**
+     * Helper function for new api test validations
+     *
+     * @export
+     * @param {string} template
+     * @returns
+     */
+    export function getValidateFetchSpecsRefByTemplate(template: string) {
+        return validateFetchSpecsRef[template];
+    }
 
     const persistSchema = {
             'type': 'object',

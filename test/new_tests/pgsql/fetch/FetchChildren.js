@@ -10,11 +10,16 @@ var Promise = require('bluebird');
 
 var knexInit = require('knex');
 var knex;
-
+var decache = require('decache');
 var schema = {};
 var schemaTable = 'index_schema_history';
 var Employee, Department, Role, roleId;
 var PersistObjectTemplate, ObjectTemplate;
+decache('supertype');
+decache('../../../../dist/index.js');
+decache('../../../../dist/lib/Knex.js');
+var Knex = require('../../../../dist/lib/Knex.js').Knex;
+
 describe('persistor transaction checks', function () {
     before('drop schema table once per test suit', function() {
         knex = knexInit({
@@ -36,13 +41,14 @@ describe('persistor transaction checks', function () {
             }),
             knex.schema.dropTableIfExists(schemaTable)]);
     })
-    after('closes the database', function () {
-        return knex.destroy();
-    });
-    beforeEach('arrange', function () {
-        ObjectTemplate = require('supertype').default;
-        PersistObjectTemplate = require('../dist/index.js').default(ObjectTemplate);
 
+    before('arrange', function () {
+
+        ObjectTemplate = require('supertype').default;
+        PersistObjectTemplate = require('../../../../dist/index.js').default(ObjectTemplate);
+        PersistObjectTemplate.setSchema({});
+        PersistObjectTemplate.schemaVerified = false;
+        
         schema.Employee = {};
         schema.Department = {};
         schema.Role = {};
@@ -69,6 +75,15 @@ describe('persistor transaction checks', function () {
         schema.Department.parents = {
             manager: {id: 'manager_id'}
         };
+
+        console.log(`\n\n\n\n\n\n\n\n\n${JSON.stringify(ObjectTemplate.__dictionary__)}\n\n\n\n\n\n`);
+        (function () {
+            PersistObjectTemplate.setDB(knex, PersistObjectTemplate.DB_Knex);
+            PersistObjectTemplate.setSchema(schema);
+            PersistObjectTemplate.jsPath = true;
+            PersistObjectTemplate.performInjections();
+        })();
+
 
         Employee = PersistObjectTemplate.create('Employee', {
             name: {type: String}
@@ -109,16 +124,10 @@ describe('persistor transaction checks', function () {
         emp.roles = [role1, role2];
 
 
-        (function () {
-            PersistObjectTemplate.setDB(knex, PersistObjectTemplate.DB_Knex);
-            PersistObjectTemplate.setSchema(schema);
-            PersistObjectTemplate.performInjections();
 
-        })();
         return Promise.resolve(prepareData());
 
         function prepareData() {
-            PersistObjectTemplate.performInjections();
             return syncTable(Employee)
                 .then(syncTable.bind(this, Department))
                 .then(syncTable.bind(this, Role))
@@ -126,7 +135,7 @@ describe('persistor transaction checks', function () {
 
 
             function syncTable(template) {
-                return PersistObjectTemplate.synchronizeKnexTableFromTemplate(template);
+                return Knex.Database.synchronizeKnexTableFromTemplate(PersistObjectTemplate, template);
             }
 
             function createRecords() {
@@ -139,7 +148,10 @@ describe('persistor transaction checks', function () {
         }
     });
 
-    afterEach('remove tables and after each test', function() {
+    after('remove tables and after each test', function() {
+        PersistObjectTemplate.setSchema({});
+        PersistObjectTemplate.schemaVerified = false;
+
         return Promise.all([
             knex.schema.dropTableIfExists('tx_employee')
            .then(function () {
@@ -148,6 +160,9 @@ describe('persistor transaction checks', function () {
                return knex.schema.dropTableIfExists('tx_role')
            }),
             knex.schema.dropTableIfExists(schemaTable)]);
+    });
+    after('closes the database', function () {
+        return knex.destroy();
     });
 
     it('load intermediate objects first and then try to load the parents ', function () {

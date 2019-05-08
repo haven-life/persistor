@@ -27,7 +27,6 @@
         "@types/chai": "^3.4.34",
         "@types/mocha": "^2.2.39",
         "@types/node": "^7.0.5",
-        "@types/q": "*",
         "@types/underscore": "*",
         "@types/bluebird": "*",
         "typescript": "*",

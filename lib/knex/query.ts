@@ -167,7 +167,7 @@ module.exports = function (PersistObjectTemplate) {
         }
         catch (err) {
             (logger || this.logger).debug({component: 'persistor', module: 'query', activity: 'getTemplateFromKnexPOJO',
-                data: `Error retrieving ${obj.__id__}.${prop} -- S3 Downloading async -- ${e.message}`});
+                data: `Error retrieving ${obj.__id__}.${prop} -- S3 Downloading async -- ${err.message}`});
             throw err;
         }
         // @TODO: Add Debug mode to add key in here

@@ -8,26 +8,29 @@ module.exports = function (PersistObjectTemplate) {
      * @param pojo
      * @param prop
      * @param buffer
+     * @param defineProperty
      * @param S3Type
      * @param S3Uploader
      * @param logger
+     * @param log
      */
-    async function uploadToS3(pojo, prop, buffer, S3Type, S3Uploader, logger) {
+    async function uploadToS3(pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log) {
+        let key;
         try {
-            const key = await S3Uploader.upload(buffer);
+            key = await S3Uploader.upload(buffer);
             pojo[prop] = key;
             log(defineProperty, pojo, prop);
         }
         catch (err) {
             (logger || this.logger).debug({
                 component: 'persistor', module: 'query', activity: 'persistSaveKnex',
-                data: `Error uploading ${pojo}.${prop} -- S3 Upload -- ${e.message}`
+                data: `Error uploading ${pojo}.${prop} -- S3 Upload -- ${err.message}`
             });
             throw err;
         }
         (logger || this.logger).debug({
             component: 'persistor', module: 'query', activity: 'persistSaveKnex',
-            data: `Uploading ${pojo}.${prop}, with key: ${key} -- S3 Upload -- ${e.message}`
+            data: `Uploading ${pojo}.${prop}, with key: ${key} -- S3 Upload`
         });
     }
 
@@ -173,7 +176,7 @@ module.exports = function (PersistObjectTemplate) {
                 pojo[prop] = (obj[prop] === null || obj[prop] === undefined) ? null : JSON.stringify(obj[prop]);
                 log(defineProperty, pojo, prop);
             } else if (defineProperty.type === S3Type) {
-                s3Promises.push(uploadToS3.bind(this, pojo, prop, buffer, S3Type, S3Uploader, logger));
+                s3Promises.push(uploadToS3.bind(this, pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log));
                 log(defineProperty, pojo, prop);
             } else if (defineProperty.type == Date) {
                 pojo[prop] = obj[prop] ? obj[prop] : null;

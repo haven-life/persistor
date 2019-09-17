@@ -38,6 +38,7 @@ module.exports = function (PersistObjectTemplate) {
          *  references to templated objects where we have to maintain foreign key relationships
          */
 
+        let s3Promises = []; // If we are uploading files, we need to fill up these uploads before we save to db.
         for (var prop in props)
         {
 
@@ -141,7 +142,10 @@ module.exports = function (PersistObjectTemplate) {
 
 
             } else if (defineProperty.type == Array || defineProperty.type == Object) {
-                pojo[prop] = (obj[prop] === null || obj[prop] === undefined)  ? null : JSON.stringify(obj[prop]);
+                pojo[prop] = (obj[prop] === null || obj[prop] === undefined) ? null : JSON.stringify(obj[prop]);
+                log(defineProperty, pojo, prop);
+            } else if (defineProperty.type === S3Type) {
+                s3Promises.push(uploadToS3.bind(this, pojo, prop, buffer, S3Type, S3Uploader, logger));
                 log(defineProperty, pojo, prop);
             } else if (defineProperty.type == Date) {
                 pojo[prop] = obj[prop] ? obj[prop] : null;
@@ -156,7 +160,12 @@ module.exports = function (PersistObjectTemplate) {
         }
         (logger || this.logger).debug({component: 'persistor', module: 'db', activity: 'dataLogging', data: {template: obj.__template__.__name__, _id: pojo._id, values: dataSaved}});
 
-        promises.push(this.saveKnexPojo(obj, pojo, isDocumentUpdate ? obj._id : null, txn, logger))
+
+        let resolveS3Promises = async () => {
+            return Promise.all(s3Promises).then(this.saveKnexPojo(obj, pojo, isDocumentUpdate ? obj._id : null, txn, logger));
+        };
+
+        promises.push(resolveS3Promises.bind(this));
         return Promise.all(promises)
             .then (function () {
                 return obj

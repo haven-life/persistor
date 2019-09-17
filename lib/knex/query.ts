@@ -56,10 +56,10 @@ module.exports = function (PersistObjectTemplate) {
         var join = 1;
         for (var prop in props) {
             var defineProperty = props[prop];
-            if (this._persistProperty(props[prop]) && props[prop].type && props[prop].type.__objectTemplate__ && props[prop].type.__table__) {
+            if (this._persistProperty(defineProperty) && defineProperty.type && defineProperty.type.__objectTemplate__ && defineProperty.type.__table__) {
                 // Create the join spec with two keys
                 if (!schema || !schema.parents || !schema.parents[prop] || !schema.parents[prop].id)
-                    throw  new Error(props[prop].type.__name__ + '.' + prop + ' is missing a parents schema entry');
+                    throw  new Error(defineProperty.type.__name__ + '.' + prop + ' is missing a parents schema entry');
                 var foreignKey = schema.parents[prop].id;
                 var cascadeFetch = (cascade && (typeof(cascade[prop]) != 'undefined')) ? cascade[prop] : null;
                 orgCascade = orgCascade || cascade;
@@ -68,10 +68,10 @@ module.exports = function (PersistObjectTemplate) {
                     cascadeFetch != false && (!cascadeFetch || !cascadeFetch.nojoin))
                     joins.push({
                         prop: prop,
-                        template: props[prop].type,
+                        template: defineProperty.type,
                         parentKey: '_id',
                         childKey: foreignKey,
-                        alias: this.dealias(props[prop].type.__table__) + join++
+                        alias: this.dealias(defineProperty.type.__table__) + join++
                     });
             }
         }
@@ -142,6 +142,40 @@ module.exports = function (PersistObjectTemplate) {
                 })
         }
     }
+
+    /**
+     *
+     * Helper function to dl from s3
+     *
+     * @param obj - Persistable(Supertype) object
+     * @param prop - property name
+     * @param key - key from S3
+     * @param S3Type
+     * @param S3Uploader
+     * @param logger
+     */
+
+   async function downloadFromS3(obj, prop, key, S3Type, S3Uploader, logger) {
+        try {
+            const buffer = await S3Uploader.download(key);
+            if (!obj[prop] || !obj[prop].constructor || obj[prop].constructor.name !== 'S3Type' ){
+                obj[prop] = new S3Type(buffer);
+            }
+            else {
+                obj[prop].buffer = buffer;
+            }
+        }
+        catch (err) {
+            (logger || this.logger).debug({component: 'persistor', module: 'query', activity: 'getTemplateFromKnexPOJO',
+                data: `Error retrieving ${obj.__id__}.${prop} -- S3 Downloading async -- ${e.message}`});
+            throw err;
+        }
+        // @TODO: Add Debug mode to add key in here
+        logger.debug(
+            {
+                component: 'persistor', module: 'query', activity: 'getTemplateFromKnexPOJO',
+                data: `Retrieving ${obj.__id__}.${prop} -- S3 Download -- Key is ${key}`});
+    };
 
     /**
      * Enriches a "Plane Old JavaScript Object (POJO)" by creating it using the new Operator
@@ -320,6 +354,23 @@ module.exports = function (PersistObjectTemplate) {
                             obj[prop] = value ? new Date(value * 1) : null;
                         else if (type == Number)
                             obj[prop] = (!value && value !== 0) ? null : value * 1;
+                        else if (type === S3Type) { // From S3ClassType, downloading file
+                           if (value) {
+                               try {
+                                   const parsedValue = JSON.parse(value);
+                                   const key = parsedValue.key;
+                                   // @TODO: Test this promise downloading out. Hijacking resolve recursive promises to asynchronously download
+                                   requests.push(downloadFromS3.bind(this, obj, prop, key, S3Type, S3Uploader, logger));
+                               }
+                               catch (e) {
+                                   (logger || this.logger).debug({component: 'persistor', module: 'query', activity: 'getTemplateFromKnexPOJO',
+                                       data: `Error retrieving ${obj.__id__}.${prop} -- S3 Download JSON.parse() -- ${e.message}`});
+                               }
+                           }
+                           else {
+                               obj[prop] = null;
+                           }
+                        }
                         else if (type == Object || type == Array)
                             try {
                                 obj[prop] = value ? JSON.parse(value) : null;

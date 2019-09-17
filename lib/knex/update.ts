@@ -14,10 +14,11 @@ module.exports = function (PersistObjectTemplate) {
      * @param logger
      * @param log
      */
-    async function uploadToS3(pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log) {
+    PersistObjectTemplate.uploadToS3 = async function(pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log) {
         let key;
         try {
             key = await S3Uploader.upload(buffer);
+            PersistObjectTemplate.S3Keys.push(key);
             pojo[prop] = key;
             log(defineProperty, pojo, prop);
         }
@@ -176,7 +177,7 @@ module.exports = function (PersistObjectTemplate) {
                 pojo[prop] = (obj[prop] === null || obj[prop] === undefined) ? null : JSON.stringify(obj[prop]);
                 log(defineProperty, pojo, prop);
             } else if (defineProperty.type === S3Type) {
-                s3Promises.push(uploadToS3.bind(this, pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log));
+                s3Promises.push(this.uploadToS3.bind(this, pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log));
                 log(defineProperty, pojo, prop);
             } else if (defineProperty.type == Date) {
                 pojo[prop] = obj[prop] ? obj[prop] : null;

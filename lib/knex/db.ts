@@ -1225,7 +1225,15 @@ module.exports = function (PersistObjectTemplate) {
                 var deadlock = err.toString().match(/deadlock detected$/i);
                 persistorTransaction.innerError = err;
                 innerError = deadlock ? new Error('Update Conflict') : err;
-                return knexTransaction.rollback(innerError).then (function () {
+                return knexTransaction.rollback(innerError)
+                    .then( async function () { //Rollback s3changes
+                        await Promise.all(PersistObjectTemplate.S3Keys.map(async (key) => {
+                            await S3Uploader.rename(key, `${key}_rollback`);
+                        }));
+                        (logger || this.logger).info({component: 'persistor', module: 'api', activity: 'end'}, `Rolling back transaction that involves S3 keys: ${PersistObjectTemplate.S3Keys.join(', ')}`);
+                        PersistObjectTemplate.S3Keys = [];
+                    }.bind(this))
+                    .then (function () {
                     (logger || this.logger).debug({component: 'persistor', module: 'api', activity: 'end'}, 'transaction rolled back ' +
                         innerError.message + (deadlock ? ' from deadlock' : ''));
                 }.bind(this));

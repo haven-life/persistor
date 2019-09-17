@@ -177,8 +177,11 @@ module.exports = function (PersistObjectTemplate) {
                 pojo[prop] = (obj[prop] === null || obj[prop] === undefined) ? null : JSON.stringify(obj[prop]);
                 log(defineProperty, pojo, prop);
             } else if (defineProperty.type === S3Type) {
-                s3Promises.push(this.uploadToS3.bind(this, pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log));
-                log(defineProperty, pojo, prop);
+                if (obj[prop] && obj[prop].buffer) {
+                    const buffer = obj[prop].buffer;
+                    s3Promises.push(this.uploadToS3.bind(this, pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log));
+                    log(defineProperty, pojo, prop);
+                }
             } else if (defineProperty.type == Date) {
                 pojo[prop] = obj[prop] ? obj[prop] : null;
                 log(defineProperty, pojo, prop);

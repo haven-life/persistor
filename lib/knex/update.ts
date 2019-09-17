@@ -4,6 +4,34 @@ module.exports = function (PersistObjectTemplate) {
     var _ = require('underscore');
 
     /**
+     *  Helper function to upload to S3
+     * @param pojo
+     * @param prop
+     * @param buffer
+     * @param S3Type
+     * @param S3Uploader
+     * @param logger
+     */
+    async function uploadToS3(pojo, prop, buffer, S3Type, S3Uploader, logger) {
+        try {
+            const key = await S3Uploader.upload(buffer);
+            pojo[prop] = key;
+            log(defineProperty, pojo, prop);
+        }
+        catch (err) {
+            (logger || this.logger).debug({
+                component: 'persistor', module: 'query', activity: 'persistSaveKnex',
+                data: `Error uploading ${pojo}.${prop} -- S3 Upload -- ${e.message}`
+            });
+            throw err;
+        }
+        (logger || this.logger).debug({
+            component: 'persistor', module: 'query', activity: 'persistSaveKnex',
+            data: `Uploading ${pojo}.${prop}, with key: ${key} -- S3 Upload -- ${e.message}`
+        });
+    }
+
+    /**
      * Save the object to persistent storage
      *
      * A copy of the object is made which has only the persistent properties

@@ -1227,10 +1227,12 @@ module.exports = function (PersistObjectTemplate) {
                 innerError = deadlock ? new Error('Update Conflict') : err;
                 return knexTransaction.rollback(innerError)
                     .then( async function () { //Rollback s3changes
-                        await Promise.all(persistorTransaction.S3Keys.map(async (key) => {
-                            await S3Uploader.rename(key, `${key}_rollback`);
-                        }));
-                        (logger || this.logger).info({component: 'persistor', module: 'api', activity: 'end'}, `Rolling back transaction that involves S3 keys: ${PersistObjectTemplate.S3Keys.join(', ')}`);
+                        if (persistorTransaction.S3Keys && persistorTransaction.S3Keys.length > 0) {
+                            await Promise.all(persistorTransaction.S3Keys.map(async (key) => {
+                                await S3Uploader.rename(key, `${key}_rollback`);
+                            }));
+                            (logger || this.logger).info({component: 'persistor', module: 'api', activity: 'end'}, `Rolling back transaction that involves S3 keys: ${persistorTransaction.S3Keys.join(', ')}`);
+                        }
                     }.bind(this))
                     .then (function () {
                     (logger || this.logger).debug({component: 'persistor', module: 'api', activity: 'end'}, 'transaction rolled back ' +

@@ -9,16 +9,22 @@ module.exports = function (PersistObjectTemplate) {
      * @param prop
      * @param buffer
      * @param defineProperty
+     * @param txn
      * @param S3Type
      * @param S3Uploader
      * @param logger
      * @param log
      */
-    PersistObjectTemplate.uploadToS3 = async function(pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log) {
+    PersistObjectTemplate.uploadToS3 = async function(pojo, prop, buffer, defineProperty, txn, S3Type, S3Uploader, logger, log) {
         let key;
         try {
             key = await S3Uploader.upload(buffer);
-            PersistObjectTemplate.S3Keys.push(key);
+            if (txn.S3Keys) {
+                txn.S3Keys.push(key);
+            }
+            else {
+                txn.S3Keys = [key];
+            }
             pojo[prop] = key;
             log(defineProperty, pojo, prop);
         }
@@ -179,7 +185,7 @@ module.exports = function (PersistObjectTemplate) {
             } else if (defineProperty.type === S3Type) {
                 if (obj[prop] && obj[prop].buffer) {
                     const buffer = obj[prop].buffer;
-                    s3Promises.push(this.uploadToS3.bind(this, pojo, prop, buffer, defineProperty, S3Type, S3Uploader, logger, log));
+                    s3Promises.push(this.uploadToS3.bind(this, pojo, prop, buffer, defineProperty, txn, S3Type, S3Uploader, logger, log));
                     log(defineProperty, pojo, prop);
                 }
             } else if (defineProperty.type == Date) {

@@ -1,3 +1,6 @@
+## 3.1.6
+* Updated knex for vulnerability
+
 ## 3.1.5
 * Fixing a bug where cascadeSave was a becoming async
 * Fixed a bug where changeTracking was on by default

@@ -7,7 +7,7 @@
     "types": "dist/index.d.ts",
     "dependencies": {
         "bluebird": "x",
-        "knex": "0.15.2",
+        "knex": "0.19.5",
         "mongodb-bluebird": "x",
         "pg": "7.4.1",
         "q": "1.x",

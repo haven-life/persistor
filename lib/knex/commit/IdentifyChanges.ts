@@ -79,7 +79,7 @@ export namespace IdentifyChanges {
             }
         }
 
-        if (Object.entries(changedProperties).length === 0 && changedProperties.constructor === Object) {
+        if (!(Object.entries(changedProperties).length === 0 && changedProperties.constructor === Object)) {
             objChanges.properties.push(changedProperties);
         }
     }

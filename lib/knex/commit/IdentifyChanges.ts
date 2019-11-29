@@ -56,7 +56,7 @@ export namespace IdentifyChanges {
         const oldValue = obj[oldKey];
         const propertyDefinition = props[prop];
 
-        if (propertyDefinition.type.isObjectTemplate) {
+        if (!propertyDefinition.type.isObjectTemplate) {
             newValue = obj[prop];
             if (oldValue !== newValue || (dateOrObject(propertyDefinition.type) && !isStringifiesEqual(oldValue, newValue))) {
                 changedProperties = {
@@ -65,7 +65,6 @@ export namespace IdentifyChanges {
                     newValue: newValue,
                     columnName: prop
                 };
-                objChanges.properties.push(changedProperties);
             }
         } else {
             newValue = obj[`${prop}Persistor`];

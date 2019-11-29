@@ -45,7 +45,7 @@ export namespace IdentifyChanges {
     // We don't want to then generate property changes for any of these shadow props, or even for the Array refs,
     // which we handle at a later time (I suppose)
     function isArrayOrPersistorShadowProp(props, propName) {
-        const propertyDefinition = props[prop];
+        const propertyDefinition = props[propName];
         const isArrayOrObjectTemplate = propertyDefinition.type === Array && propertyDefinition.of.isObjectTemplate;
         // @TODO: This may be buggy as propName.match(/Persistor$/) used to be prop.match(/Persistor$/), but prop is not in this scope
         const isPersistorObject = propName.match(/Persistor$/) && typeof props[propName.replace(/Persistor$/, '')] === 'object';

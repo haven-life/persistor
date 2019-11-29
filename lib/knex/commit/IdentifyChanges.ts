@@ -22,11 +22,9 @@ export namespace IdentifyChanges {
             if (action === 'update' || action === 'delete') {
                 const props = obj.__template__.getProperties();
                 for (var prop in props) {
-                    var propType = props[prop];
-                    if (isArrayOrPersistorObj(props, prop, propType)) {
-                        continue;
+                    if (!isArrayOrPersistorShadowProp(props, prop)) {
+                        generatePropertyChanges(props, objChanges, prop, obj);
                     }
-                    generatePropertyChanges(props, objChanges, prop, obj);
                 }
             }
 
@@ -39,9 +37,16 @@ export namespace IdentifyChanges {
         return !!(obj.__template__ && obj.__template__.__schema__ && obj.__template__.__schema__.enableChangeTracking);
     }
 
-    // @TODO: Will this EVER be a persistor object? How does this work?
-    function isArrayOrPersistorObj(props, propName, propType) {
-        const isArrayOrObjectTemplate = propType.type === Array && propType.of.isObjectTemplate;
+    // This is a confusing function, however, I've decoded it.
+    // Prop[propName] here, is the property definition of a property within a class, and not the actual instance itself
+    // For example props[propName] for homeAddress field could be {toClient: true} or {getType: () => Array }, etc.
+    // However, we also have persistor shadow properties to hold metadata (fancy word for junk) about the original property.
+    // So homeAddressPersistor will have the isFetched, id fields as well.
+    // We don't want to then generate property changes for any of these shadow props, or even for the Array refs,
+    // which we handle at a later time (I suppose)
+    function isArrayOrPersistorShadowProp(props, propName) {
+        const propertyDefinition = props[prop];
+        const isArrayOrObjectTemplate = propertyDefinition.type === Array && propertyDefinition.of.isObjectTemplate;
         // @TODO: This may be buggy as propName.match(/Persistor$/) used to be prop.match(/Persistor$/), but prop is not in this scope
         const isPersistorObject = propName.match(/Persistor$/) && typeof props[propName.replace(/Persistor$/, '')] === 'object';
         return isArrayOrObjectTemplate || isPersistorObject;

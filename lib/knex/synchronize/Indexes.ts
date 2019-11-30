@@ -22,17 +22,17 @@ export namespace Indexes {
 
         try {
             // Loading the Schema definition
-            const loadRes = await loadSchema(tableName, {}, knex, schemaTable, schemaField, template);
+            const loadRes = await loadSchema(tableName, undefined, knex, schemaTable, schemaField, template);
             let _dbschema = loadRes._dbschema;
-            tableName = loadRes.name && loadRes.name;
+            let name = loadRes.name && loadRes.name;
 
             // Loading Table Definition
-            let res = loadTableDef(_dbschema, schema, tableName);
+            let res = loadTableDef(_dbschema, schema, name);
             _dbschema = res._dbschema;
-            tableName = res.name;
+            name = res.name;
             schema = res.schema;
 
-            diffTable(_dbschema, schema, tableName, _changes);
+            diffTable(_dbschema, schema, name, _changes);
 
             generateChanges(template, undefined, tableName, _changes, _dbschema);
 
@@ -58,7 +58,7 @@ export namespace Indexes {
 
         // create
         if (!exists) {
-            knex.schema.createTable(schemaTable, (table) => { // Do we do anything with this?
+            await knex.schema.createTable(schemaTable, (table) => { // @TODO: need to issue a PR to knex for bad type. This is ASYNC
                 table.increments('sequence_id').primary();
                 table.text(schemaField);
                 table.timestamps();
@@ -134,8 +134,8 @@ export namespace Indexes {
     }
 
     async function applyTableChanges(dbChanges, knex: Knex, tableName: string) {
-        return knex.transaction(function (trx) {
-            return trx.schema.table(tableName, function (table) {
+        return await knex.transaction(async function (trx) {
+            return await trx.schema.table(tableName, function (table) {
                 syncIndexesForHierarchy('delete', dbChanges, table, tableName);
                 syncIndexesForHierarchy('add', dbChanges, table, tableName);
                 syncIndexesForHierarchy('change', dbChanges, table, tableName);

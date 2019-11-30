@@ -8,7 +8,7 @@
     "dependencies": {
         "aws-sdk": "^2.580.0",
         "bluebird": "^3.7.2",
-        "knex": "0.20.3",
+        "knex": "^0.20.3",
         "mongodb-bluebird": "x",
         "pg": "7.4.1",
         "q": "1.x",

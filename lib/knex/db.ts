@@ -3,6 +3,7 @@ import {LoggerHelpers} from '../LoggerHelpers';
 import {Transaction} from './commit/Transaction';
 import {MongoQuery} from './mongoQuery/MongoQuery';
 import {Indexes} from './synchronize/Indexes';
+import {Helpers} from './Helpers';
 
 
 module.exports = function (PersistObjectTemplate) {
@@ -106,12 +107,12 @@ module.exports = function (PersistObjectTemplate) {
                 template = template.__parent__;
 
             asStandard(template, this.dealias(template.__table__));
-            _.each(getPropsRecursive(template), function (defineProperties, prop) {
+            _.each(Helpers.getPropsRecursive(template), function (defineProperties, prop) {
                 as(template, this.dealias(template.__table__), prop, defineProperties)
             }.bind(this));
             _.each(joins, function (join) {
                 asStandard(join.template, join.alias);
-                _.each(getPropsRecursive(join.template), function (defineProperties, prop) {
+                _.each(Helpers.getPropsRecursive(join.template), function (defineProperties, prop) {
                     as(join.template, join.alias, prop, defineProperties)
                 })
             }.bind(this));
@@ -140,18 +141,6 @@ module.exports = function (PersistObjectTemplate) {
                     prop = schema.parents[prop].id;
                 }
                 cols.push(prefix + '.' + prop + ' as ' + (prefix ? prefix + '___' : '') + prop);
-            }
-
-            function getPropsRecursive(template, map?) {
-                map = map || {};
-                _.map(template.getProperties(), function (val, prop) {
-                    map[prop] = val
-                });
-                template = template.__children__;
-                template.forEach(function (template) {
-                    getPropsRecursive(template, map);
-                });
-                return map;
             }
         }
     };
@@ -398,7 +387,7 @@ module.exports = function (PersistObjectTemplate) {
             throw new Error(template.__name__ + ' is missing a schema entry');
         }
 
-        var props = getPropsRecursive(template);
+        var props = Helpers.getPropsRecursive(template);
         var knex = this.getDB(this.getDBAlias(template.__table__)).connection;
         var schema = template.__schema__;
         var _newFields = {};
@@ -575,7 +564,7 @@ module.exports = function (PersistObjectTemplate) {
                             _newFields[prop] = props[prop];
                         }
                         else {
-                            if (!iscompatible(props[prop].type.name, info[propToColumnName(prop)].type)) {
+                            if (!Helpers.iscompatible(props[prop].type.name, info[propToColumnName(prop)].type)) {
                                 throw new Error('Changing the type of ' + prop + ' on ' + table
                                     + ', changing types for the fields is not allowed, please use scripts to make these changes');
                             }
@@ -610,35 +599,6 @@ module.exports = function (PersistObjectTemplate) {
         }
     }
 
-
-    function iscompatible(persistortype, pgtype) {
-        switch (persistortype) {
-        case 'String':
-        case 'Object':
-        case 'Array':
-            return pgtype.indexOf('text') > -1;
-        case 'Number':
-            return pgtype.indexOf('double precision') > -1;
-        case 'Boolean':
-            return pgtype.indexOf('bool') > -1;
-        case 'Date':
-            return pgtype.indexOf('timestamp') > -1;
-        default:
-            return pgtype.indexOf('text') > -1; // Typed objects have no name
-        }
-    }
-
-    function getPropsRecursive(template, map?) {
-        map = map || {};
-        _.map(template.getProperties(), function (val, prop) {
-            map[prop] = val
-        });
-        template = template.__children__;
-        template.forEach(function (template) {
-            getPropsRecursive(template, map);
-        });
-        return map;
-    }
 
     PersistObjectTemplate.persistTouchKnex = function(obj, txn, logger) {
         (logger || this.logger).debug({component: 'persistor', module: 'db.persistTouchKnex', activity: 'pre',

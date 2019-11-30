@@ -1,4 +1,5 @@
 import * as Knex from 'knex';
+import * as _ from 'underscore';
 
 export namespace Indexes {
     export async function sync (persistor, tableName, template) {

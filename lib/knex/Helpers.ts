@@ -1,3 +1,5 @@
+import * as _ from 'underscore';
+
 export namespace Helpers {
     export function iscompatible(persistortype, pgtype) {
         switch (persistortype) {

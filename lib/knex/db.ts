@@ -249,7 +249,7 @@ module.exports = function (PersistObjectTemplate) {
         if (typeof(queryOrChains) == 'function')
             queryOrChains(knex);
         else if (queryOrChains)
-            (this.convertMongoQueryToChains)(tableName, knex, queryOrChains);
+            (MongoQuery.convertMongoQueryToChains)(tableName, knex, queryOrChains);
 
         return knex.delete();
     };

@@ -191,7 +191,7 @@ export namespace MongoQuery {
                     if (params[2] && params[2].source)
                         params[2] = params[2].source;
                 } else
-                    throw `Can't handle ${prop}${JSON.stringify(value)}`;
+                    throw `Can't handle ${prop}: ${JSON.stringify(value)}`;
             }
         return params;
     }

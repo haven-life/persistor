@@ -6,15 +6,15 @@
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "dependencies": {
-        "aws-sdk": "2.x",
-        "bluebird": "x",
+        "aws-sdk": "^2.580.0",
+        "bluebird": "^3.7.2",
         "knex": "0.20.3",
         "mongodb-bluebird": "x",
         "pg": "7.4.1",
         "q": "1.x",
-        "tv4": "^1.2.7",
-        "underscore": "1.x",
         "tslib": "^1.10.0",
+        "tv4": "^1.2.7",
+        "underscore": "^1.9.1",
         "uuid": "3.3.3"
     },
     "peerDependencies": {
@@ -22,12 +22,12 @@
     },
     "devDependencies": {
         "@havenlife/supertype": "3.x",
-        "@types/bluebird": "*",
+        "@types/bluebird": "^3.5.29",
         "@types/chai": "^3.4.34",
         "@types/mocha": "^2.2.39",
-        "@types/node": "^7.0.5",
+        "@types/node": "^7.10.9",
         "@types/q": "*",
-        "@types/underscore": "*",
+        "@types/underscore": "^1.9.4",
         "chai": "3.x",
         "chai-as-promised": "^5.1.0",
         "eslint": "3.7.x",
@@ -36,8 +36,8 @@
         "nyc": "13.0.0",
         "sinon": "1.15.x",
         "sinon-chai": "2.8.x",
-        "ts-node": "*",
-        "typescript": "*"
+        "ts-node": "^8.5.4",
+        "typescript": "^3.7.2"
     },
     "directories": {},
     "engines": {

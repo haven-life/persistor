@@ -167,11 +167,10 @@ module.exports = function (PersistObjectTemplate) {
 
                     try {
                         if(txn) {
-                            if(txn.remoteObjects) {
-                                txn.remoteObjects.add(objectKey);
-                            } else {
-                                txn.remoteObjects = new Set(objectKey); // @TODO: Ask Nick if this works as intended
+                            if (!txn.remoteObjects) {
+                                txn.remoteObjects = new Set(); // @TODO: Ask Nick if this works as intended
                             }
+                            txn.remoteObjects.add(objectKey);
                         }
 
                         // grab the document from remote store

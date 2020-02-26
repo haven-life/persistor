@@ -336,8 +336,8 @@ describe('Banking from pgsql Example', function () {
                     }
                 });
                 PersistObjectTemplate.setRemoteDocConnection({
-                    bucketName: 'test-bucket-persistor',
-                    environment: 'local'
+                    persistorRemoteDocBucketName: 'test-bucket-persistor',
+                    persistorRemoteDocEnvironment: 'local'
                 });
                 PersistObjectTemplate.setDB(knex, PersistObjectTemplate.DB_Knex,  'pg');
                 PersistObjectTemplate.setSchema(schema);

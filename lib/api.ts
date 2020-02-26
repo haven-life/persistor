@@ -1131,8 +1131,8 @@ module.exports = function (PersistObjectTemplate, baseClassForPersist) {
      * object storage functionality. if enabled, config
      */
     PersistObjectTemplate.setRemoteDocConnection = function (options: RemoteDocConnectionOptions): void {
-        this.bucketName = options.bucketName;
-        this.environment = options.environment;
+        this.bucketName = options.persistorRemoteDocBucketName;
+        this.environment = options.persistorRemoteDocEnvironment;
     };
 
     /**

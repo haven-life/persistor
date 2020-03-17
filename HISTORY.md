@@ -1,4 +1,5 @@
-
+## 3.2.4
+* using the OS' temp directory for storing documents instead of the project root
 ## 3.2.3
 * Audit fixes.
 ## 3.2.2
